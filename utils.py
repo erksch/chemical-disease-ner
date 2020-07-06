@@ -2,24 +2,26 @@
 
 import numpy as np
 
-def createBatches(data):
-    l = []
-    for i in data:
-        l.append(len(i[0]))
-    l = set(l)
-    batches = []
+def createBatches(sentences):
+    sentence_lengths = []
+    for tokens, labels in sentences:
+        sentence_lengths.append(len(tokens))
+    sentence_lengths = set(sentence_lengths)
+    print(f"Unique sentence lengths: {sentence_lengths}")
+    print(f"Amount of unique sentence lengths: {len(sentence_lengths)}")
+    batches = [] # a batch is a list of sentences with the same length
     batch_len = []
     z = 0
-    for i in l:
-        for batch in data:
-            if len(batch[0]) == i:
-                batches.append(batch)
+    for i in sentence_lengths:
+        for sentence in sentences:
+            if len(sentence[0]) == i:
+                batches.append(sentence)
                 z += 1
         batch_len.append(z)
     return batches, batch_len
 
 
-# returns matrix with 1 entry = list of 4 elements:
+# returns matrix with 1 entry = list of 2 elements:
 # word indices, label indices
 def createMatrices(sentences, word2Idx, label2Idx):
     unknownIdx = word2Idx['UNKNOWN_TOKEN']

@@ -1,67 +1,24 @@
-# From: https://github.com/kamalkraj/Named-Entity-Recognition-with-Bidirectional-LSTM-CNNs
+def compute_accuracy(predictions, ground_truth, idx2Label):
+    correct = 0
+    classes_correct = {}
+    total = 0
+    classes_total = {}
 
-import numpy as np
-
-# Method to compute the accuracy. Call predict_labels to get the labels for the dataset
-def compute_f1(predictions, correct, idx2Label):
     label_pred = []
-    for sentence in predictions:
-        label_pred.append([idx2Label[element] for element in sentence])
+    for i, sentence in enumerate(predictions):
+        for j, token_label in enumerate(sentence):
+            true_label = ground_truth[i][j]
+            total += 1
+            if not true_label in classes_total:
+                classes_total[true_label] = 0
+                classes_correct[true_label] = 0
+            classes_total[true_label] += 1
+            if token_label == true_label:
+                correct += 1
+                classes_correct[true_label] += 1
 
-    label_correct = []
-    for sentence in correct:
-        label_correct.append([idx2Label[element] for element in sentence])
+    print(f"All classes: {correct} / {total}, Accuracy {correct / total}")
 
-    # print("predictions ", len(label_pred))
-    # print("correct labels ", len(label_correct))
+    for label_idx in list(classes_total.keys()):
+        print(f"{idx2Label[label_idx]}: {classes_correct[label_idx]} / {classes_total[label_idx]}, Accuracy {classes_correct[label_idx] / classes_total[label_idx]}")
 
-    prec = compute_precision(label_pred, label_correct)
-    rec = compute_precision(label_correct, label_pred)
-
-    f1 = 0
-    if (rec + prec) > 0:
-        f1 = 2.0 * prec * rec / (prec + rec);
-
-    return prec, rec, f1
-
-
-def compute_precision(guessed_sentences, correct_sentences):
-    assert (len(guessed_sentences) == len(correct_sentences))
-    correctCount = 0
-    count = 0
-
-    for sentenceIdx in range(len(guessed_sentences)):
-        guessed = guessed_sentences[sentenceIdx]
-        correct = correct_sentences[sentenceIdx]
-        assert (len(guessed) == len(correct))
-        idx = 0
-        while idx < len(guessed):
-            if guessed[idx][0] == 'B':  # a new chunk starts
-                count += 1
-
-                if guessed[idx] == correct[idx]:  # first prediction correct
-                    idx += 1
-                    correctlyFound = True
-
-                    while idx < len(guessed) and guessed[idx][0] == 'I':  # scan entire chunk
-                        if guessed[idx] != correct[idx]:
-                            correctlyFound = False 
-
-                        idx += 1
-
-                    if idx < len(guessed):
-                        if correct[idx][0] == 'I':  # chunk in correct was longer
-                            correctlyFound = False
-
-                    if correctlyFound:
-                        correctCount += 1
-                else:
-                    idx += 1
-            else:
-                idx += 1
-
-    precision = 0
-    if count > 0:
-        precision = float(correctCount) / count
-
-    return precision

@@ -4,12 +4,14 @@ from keras.optimizers import Nadam
 from process_dataset import process_dataset_xml
 from model import Network
 
-print(tf.__version__)
-print(keras.__version__)
+print(f"Tensorflow Version: {tf.__version__}")
+print(f"Keras Version: {keras.__version__}")
 
 print("Preprocessing data...")
 train_data = process_dataset_xml('data/CDR_Data/CDR.Corpus.v010516/CDR_TrainingSet.BioC.xml')
 test_data = process_dataset_xml('data/CDR_Data/CDR.Corpus.v010516/CDR_TestSet.BioC.xml')
+print("Done.")
+
 
 """Set parameters"""
 

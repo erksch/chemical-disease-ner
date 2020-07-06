@@ -4,10 +4,9 @@ import gensim
 import numpy as np
 from keras.models import Model, load_model
 from keras.layers import TimeDistributed, Dense, Embedding, Input, LSTM, Bidirectional
-from keras.utils import plot_model
 
 from utils import createMatrices, createBatches, iterate_minibatches
-from validation import compute_f1
+from validation import compute_accuracy
 
 class Network(object):
     
@@ -23,7 +22,7 @@ class Network(object):
     def loadData(self, trainSentences, testSentences):
         """Load data and add character information"""
         self.trainSentences = trainSentences
-        self.testSentences = testSentences
+        #self.testSentences = testSentences
 
     def embed(self):
         """Create word- and character-level embeddings"""
@@ -31,13 +30,18 @@ class Network(object):
         labelSet = set()
         words = {}
 
+        print(f"{len(self.trainSentences)} sentences")
+
         # unique words and labels in data  
+        print("Extracting words and labels...")
         for dataset in [self.trainSentences]:#, self.devSentences, self.testSentences]:
             for sentence in dataset:
                 for token, label in sentence:
                     labelSet.add(label)
                     words[token.lower()] = True
                     
+        print(f"Extracted {len(words)} words and {len(labelSet)} labels.")
+
         # mapping for labels
         self.label2Idx = {}
         for label in labelSet:
@@ -48,14 +52,16 @@ class Network(object):
         self.wordEmbeddings = []
 
         word2Idx["PADDING_TOKEN"] = 0
-        vector = np.zeros(300)
+        vector = np.zeros(200)
         self.wordEmbeddings.append(vector)
 
         word2Idx["UNKNOWN_TOKEN"] = 1
-        vector = np.random.uniform(-0.25, 0.25, 300)
+        vector = np.random.uniform(-0.25, 0.25, 200)
         self.wordEmbeddings.append(vector)
-        
+       
+        print("Loading embeddings...") 
         embeddings = gensim.models.KeyedVectors.load_word2vec_format('embeddings/BioWordVec_PubMed_MIMICIII_d200.vec.bin', binary=True)
+        print("Done.")
 
         # loop through each word in embeddings
         for word in embeddings.vocab:
@@ -65,14 +71,16 @@ class Network(object):
                 word2Idx[word] = len(word2Idx)
 
         self.wordEmbeddings = np.array(self.wordEmbeddings)
-        
+        print(f"Found embeddings for {self.wordEmbeddings.shape[0]} of {len(words)} words.")
+
         print("Saving word2Idx to file")
         w = csv.writer(open("word2Idx.csv", "w"))
         for key, val in word2Idx.items():
             w.writerow([key, val])
 
         self.train_set = createMatrices(self.trainSentences, word2Idx, self.label2Idx)
-        self.test_set = createMatrices(self.testSentences, word2Idx, self.label2Idx)
+        print(len(self.train_set))
+        #self.test_set = createMatrices(self.testSentences, word2Idx, self.label2Idx)
 
         self.idx2Label = {v: k for k, v in self.label2Idx.items()}
 
@@ -84,7 +92,8 @@ class Network(object):
     def createBatches(self):
         """Create batches"""
         self.train_batch, self.train_batch_len = createBatches(self.train_set)
-        self.test_batch, self.test_batch_len = createBatches(self.test_set)
+        #self.test_batch, self.test_batch_len = createBatches(self.test_set)
+        print(f"Train batch size: {len(self.train_batch)}")
         
     def tag_dataset(self, dataset, model):
         """Tag data with numerical values"""
@@ -121,34 +130,36 @@ class Network(object):
         
         self.init_weights = self.model.get_weights()
         
-        plot_model(self.model, to_file='model.png')
+        # plot_model(self.model, to_file='model.png')
         
-        print("Model built. Saved model.png\n")
+        print("Model built.")
         
     def train(self):
         """Default training"""
 
+        self.f1_train_history = []
         self.f1_test_history = []
         self.f1_dev_history = []
 
         for epoch in range(self.epochs):    
             print("Epoch {}/{}".format(epoch, self.epochs))
-            for i,batch in enumerate(iterate_minibatches(self.train_batch,self.train_batch_len)):
+            for i, batch in enumerate(iterate_minibatches(self.train_batch, self.train_batch_len)):
                 labels, tokens = batch       
                 self.model.train_on_batch([tokens], labels)
 
-            # compute F1 scores
-            predLabels, correctLabels = self.tag_dataset(self.test_batch, self.model)
-            pre_test, rec_test, f1_test = compute_f1(predLabels, correctLabels, self.idx2Label)
-            self.f1_test_history.append(f1_test)
-            print("f1 test ", round(f1_test, 4))
+            predLabels, correctLabels = self.tag_dataset(self.train_batch, self.model)
+            compute_accuracy(predLabels, correctLabels, self.idx2Label)
+            
+            #predLabels, correctLabels = self.tag_dataset(self.test_batch, self.model)
+            #pre_test, rec_test, f1_test = compute_f1(predLabels, correctLabels, self.idx2Label)
+            #self.f1_test_history.append(f1_test)
+            #print("f1 test ", round(f1_test, 4))
 
             #predLabels, correctLabels = self.tag_dataset(self.dev_batch, self.model)
             #pre_dev, rec_dev, f1_dev = compute_f1(predLabels, correctLabels, self.idx2Label)
             #self.f1_dev_history.append(f1_dev)
             #print("f1 dev ", round(f1_dev, 4), "\n")
             
-        print("Final F1 test score: ", f1_test)
             
         print("Training finished.")
             
