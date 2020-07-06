@@ -164,11 +164,10 @@ class Network(object):
         print("Training finished.")
             
         # save model
-        self.modelName = "{}_{}_{}_{}_{}_{}_{}".format(self.epochs, 
+        self.modelName = "{}_{}_{}_{}_{}_{}".format(self.epochs, 
                                                         self.dropout, 
                                                         self.dropout_recurrent, 
                                                         self.lstm_state_size,
-                                                        self.conv_size,
                                                         self.learning_rate,
                                                         self.optimizer.__class__.__name__
                                                        )
