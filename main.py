@@ -9,6 +9,7 @@ def main():
   print(f"Torch Version: {torch.__version__}")
   print(f"CUDA available: {torch.cuda.is_available()}")
 
+  device = torch.device('cuda')
   writer = SummaryWriter()
 
   print("Preprocessing data...")
@@ -23,7 +24,9 @@ def main():
       embeddings_path='embeddings/BioWordVec_PubMed_MIMICIII_d200.vec.bin')
   train_sentences = format_to_tensor(train_sentences, word2Idx, label2Idx)
 
-  model = BiLSTM(word_embeddings=torch.FloatTensor(word_embeddings), num_classes=len(label2Idx))
+  model = BiLSTM(
+      word_embeddings=torch.FloatTensor(word_embeddings).to(device), 
+      num_classes=len(label2Idx)).to(device)
 
   epochs = 100
   learning_rate = 0.015
@@ -38,8 +41,8 @@ def main():
     all_predicted_labels = []
 
     for tokens, true_labels in dataset:
-        tokens = torch.LongTensor([tokens])
-        true_labels = torch.LongTensor(true_labels)
+        tokens = torch.LongTensor([tokens]).to(device)
+        true_labels = torch.LongTensor(true_labels).to(device)
 
         predicted_labels = net(tokens)
         predicted_labels = predicted_labels.argmax(axis=2).squeeze(dim=0)
@@ -56,8 +59,8 @@ def main():
         model.train()
     
         for tokens, true_labels in train_sentences:
-            tokens = torch.LongTensor([tokens])
-            true_labels = torch.LongTensor(true_labels)
+            tokens = torch.LongTensor([tokens]).to(device)
+            true_labels = torch.LongTensor(true_labels).to(device)
             optimizer.zero_grad()
             predicted_labels = model(tokens)
             predicted_labels = predicted_labels.squeeze(dim=0)

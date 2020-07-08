@@ -1,3 +1,4 @@
+import time
 import numpy as np
 import gensim
 from xml.dom import minidom
@@ -99,8 +100,11 @@ def prepare_embeddings(sentences, embeddings_path, embeddings_dim):
     word_embeddings.append(vector)
 
     print("Loading embeddings...") 
+
+    start = time.time()
     embeddings = gensim.models.KeyedVectors.load_word2vec_format(embeddings_path, binary=True)
-    print("Done.")
+    end = time.time()
+    print(f"Completed in {end - start} seconds.")
 
     # loop through each word in embeddings
     for word in embeddings.vocab:
