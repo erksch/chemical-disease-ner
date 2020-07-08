@@ -57,14 +57,15 @@ def main():
             predicted_labels = model(tokens)
             predicted_labels = predicted_labels.argmax(axis=2).squeeze(dim=0)
             total += len(predicted_labels)
-            correct += (predicted_labels == true_labels).sum()
+            correct += (predicted_labels == true_labels).sum().item()
 
             for i, true_label in enumerate(true_labels):
+                true_label = true_label.item()
                 if not true_label in classes_correct:
                     classes_correct[true_label] = 0
                     classes_total[true_label] = 0
                 classes_total[true_label] += 1 
-                if true_label == predicted_labels[i]:
+                if true_label == predicted_labels[i].item():
                     classes_correct[true_label] += 1
 
         print(f"All classes: {correct} / {total}, Accuracy {correct / total}")
