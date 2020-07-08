@@ -1,29 +1,120 @@
-# From: https://github.com/kamalkraj/Named-Entity-Recognition-with-Bidirectional-LSTM-CNNs
-
 import numpy as np
+import gensim
+from xml.dom import minidom
+from nltk.tokenize import sent_tokenize, word_tokenize
 
-def createBatches(sentences):
-    sentence_lengths = []
-    for tokens, labels in sentences:
-        sentence_lengths.append(len(tokens))
-    sentence_lengths = set(sentence_lengths)
-    print(f"Unique sentence lengths: {sentence_lengths}")
-    print(f"Amount of unique sentence lengths: {len(sentence_lengths)}")
-    batches = [] # a batch is a list of sentences with the same length
-    batch_len = []
-    z = 0
-    for i in sentence_lengths:
-        for sentence in sentences:
-            if len(sentence[0]) == i:
-                batches.append(sentence)
-                z += 1
-        batch_len.append(z)
-    return batches, batch_len
+def get_text(node):
+    return node.childNodes[0].data
+    
+def process_dataset_xml(file_path):
+    xml = minidom.parse(file_path)
+    documents = xml.getElementsByTagName('document')
+    all_sentences = []
+    
+    for document in documents:
+        text = ""
+        passages = document.getElementsByTagName('passage')
+        assert(len(passages) == 2)
+        title, abstract = passages
+        text += get_text(title.getElementsByTagName('text')[0])
+        text += ' '
+        text += get_text(abstract.getElementsByTagName('text')[0])
+        annotations = document.getElementsByTagName('annotation')
+        sentences = sent_tokenize(text)
+        tokens = [word_tokenize(sentence) for sentence in sentences]
+        
+        labels = []
+        
+        for annotation in annotations:
+            entity = get_text(annotation.getElementsByTagName('infon')[0])
+            location = annotation.getElementsByTagName('location')[0]
+            offset = int(location.attributes['offset'].value)
+            length = int(location.attributes['length'].value)
+            labels.append([text[offset:offset+length], entity])
+            
+        token_labels = []
+        label_idx = 0
+        label_start = 0
+        
+        for sentence in tokens:
+            out = []
+            
+            for token in sentence:
+                if label_idx == len(labels):
+                    out.append([token, 'O'])
+                    continue
+                    
+                text, entity = labels[label_idx]
+                text = text[label_start:]
+                
+                if token == text:
+                    label_idx += 1
+                    out.append([token, entity])
+                    label_start = 0
+                elif text.startswith(token):
+                    label_start += len(token)
+                    out.append([token, entity])
+                elif text in token:
+                    label_idx += 1
+                    out.append([token, entity])
+                else:
+                    out.append([token, 'O'])
+                    label_start = 0
+            
+            token_labels.append(out)
 
+        for sentence in token_labels:
+            all_sentences.append(sentence)
 
-# returns matrix with 1 entry = list of 2 elements:
-# word indices, label indices
-def createMatrices(sentences, word2Idx, label2Idx):
+    return all_sentences
+
+def prepare_embeddings(sentences, embeddings_path, embeddings_dim):
+    labels = set()
+    words = {}
+
+    print("Extracting words and labels...")
+    for sentence in sentences:
+        for token, label in sentence:
+            labels.add(label)
+            words[token.lower()] = True
+    print(f"Extracted {len(words)} words and {len(labels)} labels.")
+
+    # mapping for labels
+    label2Idx = {}
+    for label in labels:
+        label2Idx[label] = len(label2Idx)
+    
+    idx2Label = {v: k for k, v in label2Idx.items()}
+
+    # read GLoVE word embeddings
+    word2Idx = {}
+    word_embeddings = []
+
+    word2Idx["PADDING_TOKEN"] = 0
+    vector = np.zeros(embeddings_dim)
+    word_embeddings.append(vector)
+
+    word2Idx["UNKNOWN_TOKEN"] = 1
+    vector = np.random.uniform(-0.25, 0.25, embeddings_dim)
+    word_embeddings.append(vector)
+
+    print("Loading embeddings...") 
+    embeddings = gensim.models.KeyedVectors.load_word2vec_format(embeddings_path, binary=True)
+    print("Done.")
+
+    # loop through each word in embeddings
+    for word in embeddings.vocab:
+        if word.lower() in words:
+            vector = embeddings.wv[word]
+            word_embeddings.append(vector)
+            word2Idx[word] = len(word2Idx)
+
+    word_embeddings = np.array(word_embeddings)
+    print(f"Found embeddings for {word_embeddings.shape[0]} of {len(words)} words.")
+    
+    return word_embeddings, word2Idx, label2Idx, idx2Label
+
+def format_to_tensor(sentences, word2Idx, label2Idx):
     unknownIdx = word2Idx['UNKNOWN_TOKEN']
     paddingIdx = word2Idx['PADDING_TOKEN']
 
@@ -45,26 +136,9 @@ def createMatrices(sentences, word2Idx, label2Idx):
             else:
                 wordIdx = unknownIdx
                 unknownWordCount += 1
-            # Get the label and map to int
             wordIndices.append(wordIdx)
             labelIndices.append(label2Idx[label])
 
         dataset.append([wordIndices, labelIndices])
 
     return dataset
-
-
-def iterate_minibatches(dataset, batch_len):
-    start = 0
-    for i in batch_len:
-        tokens = []
-        labels = []
-        data = dataset[start:i]
-        start = i
-        for dt in data:
-            t, l = dt
-            l = np.expand_dims(l, -1)
-            tokens.append(t)
-            labels.append(l)
-        
-        yield np.asarray(labels), np.asarray(tokens)
