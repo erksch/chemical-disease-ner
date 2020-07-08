@@ -4,3 +4,4 @@ embeddings
 venv
 idx2Label.csv
 word2Idx.csv
+runs
