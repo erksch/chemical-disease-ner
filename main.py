@@ -1,8 +1,10 @@
 import torch
 import torch.nn as nn
 import numpy as np
+from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
-from utils import process_dataset_xml, format_to_tensors, prepare_embeddings, prepare_indices
+from dataset import CDRDataset
+from utils import process_dataset_xml, prepare_embeddings, prepare_indices
 from model import BiLSTM
 
 def main():
@@ -38,13 +40,14 @@ def main():
           use_pretrained_embeddings=False,
           num_classes=len(label2Idx)).to(device)
 
-  X_train, Y_train = format_to_tensors(train_sentences, word2Idx, label2Idx, device)
-
   num_classes = len(label2Idx)
   epochs = 100
   learning_rate = 0.015
   momentum = 0.9
   batch_size = 100
+
+  dataset = CDRDataset(train_sentences, word2Idx, label2Idx)
+  dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
 
   criterion = nn.CrossEntropyLoss()
   optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate, momentum=momentum)
@@ -55,13 +58,8 @@ def main():
   for epoch in range(epochs):  
         model.train()
 
-        permutation = torch.randperm(X_train.size()[0])
-
-        for i in range(0, X_train.size()[0], batch_size):
+        for batch_x, batch_y in dataloader:
             optimizer.zero_grad()
-
-            indices = permutation[i:i+batch_size]
-            batch_x, batch_y = X_train[indices], Y_train[indices]
 
             prediction = model(batch_x).reshape(-1, num_classes)
             loss = criterion(prediction, batch_y.reshape(-1))
@@ -74,6 +72,7 @@ def main():
        
         model.eval()
 
+        """
         ground_truth = Y_train.reshape(-1)
         predictions = model(X_train).argmax(dim=2).reshape(-1)
         true_positives = (ground_truth == predictions).sum().item()
@@ -104,6 +103,7 @@ def main():
             writer.add_scalar(f"Precision/{idx2Label[label]}/train_epoch", precision, epoch)
             writer.add_scalar(f"Recall/{idx2Label[label]}/train_epoch", recall, epoch)
             writer.add_scalar(f"F1Score/{idx2Label[label]}/train_epoch", f1_score, epoch)
-       
+       """
+
 if __name__ == '__main__':
     main()
