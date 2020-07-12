@@ -142,3 +142,32 @@ def prepare_embeddings(sentences, embeddings_path, embeddings_dim):
     print(f"Found embeddings for {word_embeddings.shape[0]} of {len(words)} words.")
     
     return word_embeddings, word2Idx, label2Idx, idx2Label
+
+def text_to_indices(sentences, word2Idx, label2Idx):
+    unknown_idx = word2Idx['UNKNOWN_TOKEN']
+    padding_idx = word2Idx['PADDING_TOKEN']
+
+    X = []
+    Y = []
+
+    null_label = 'O'
+
+    for sentence in sentences:
+        word_indices = []
+        label_indices = []
+
+        for word, label in sentence:
+            if word in word2Idx:
+                wordIdx = word2Idx[word]
+            elif word.lower() in word2Idx:
+                wordIdx = word2Idx[word.lower()]
+            else:
+                wordIdx = unknown_idx
+            word_indices.append(wordIdx)
+            label_indices.append(label2Idx[label])
+
+        X.append(word_indices)
+        Y.append(label_indices)
+
+    return X, Y
+

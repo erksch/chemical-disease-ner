@@ -3,8 +3,8 @@ import torch.nn as nn
 import numpy as np
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
-from dataset import CDRDataset
-from utils import process_dataset_xml, prepare_embeddings, prepare_indices
+from dataset import CDRDataset, UniqueSentenceLengthSampler
+from utils import process_dataset_xml, prepare_embeddings, prepare_indices, text_to_indices
 from model import BiLSTM
 
 def main():
@@ -14,7 +14,7 @@ def main():
   device = torch.device('cuda')
   writer = SummaryWriter()
   
-  use_embeddings = True
+  use_embeddings = False
 
   print("Preprocessing data...")
   train_sentences = process_dataset_xml('data/CDR_Data/CDR.Corpus.v010516/CDR_TrainingSet.BioC.xml')
@@ -46,8 +46,9 @@ def main():
   momentum = 0.9
   batch_size = 100
 
-  dataset = CDRDataset(train_sentences, word2Idx, label2Idx)
-  dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
+  all_x, all_y = text_to_indices(train_sentences, word2Idx, label2Idx)
+  dataset = CDRDataset(all_x, all_y, pad_sentences=False)
+  dataloader = DataLoader(dataset, batch_sampler=UniqueSentenceLengthSampler(dataset))
 
   criterion = nn.CrossEntropyLoss()
   optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate, momentum=momentum)
@@ -70,7 +71,7 @@ def main():
             writer.add_scalar('Loss/train_step', loss, n_iter)
             n_iter += 1
        
-        model.eval()
+        print(f"Epoch {epoch}, Loss {loss.item()}")
 
         """
         ground_truth = Y_train.reshape(-1)
