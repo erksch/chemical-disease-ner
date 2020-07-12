@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import numpy as np
 from torch.utils.tensorboard import SummaryWriter
-from utils import process_dataset_xml, format_to_tensor, prepare_embeddings
+from utils import process_dataset_xml, format_to_tensors, prepare_embeddings, prepare_indices
 from model import BiLSTM
 
 def main():
@@ -11,6 +11,8 @@ def main():
 
   device = torch.device('cuda')
   writer = SummaryWriter()
+  
+  use_embeddings = True
 
   print("Preprocessing data...")
   train_sentences = process_dataset_xml('data/CDR_Data/CDR.Corpus.v010516/CDR_TrainingSet.BioC.xml')
@@ -18,63 +20,62 @@ def main():
   # dev_sentences = process_dataset_xml('data/CDR_Data/CDR.Corpus.v010516/CDR_DevelopmentSet.BioC.xml')
   print("Done.")
 
-  word_embeddings, word2Idx, label2Idx, idx2Label = prepare_embeddings(
-      train_sentences, 
-      embeddings_dim=200, 
-      embeddings_path='embeddings/BioWordVec_PubMed_MIMICIII_d200.vec.bin')
-  train_sentences = format_to_tensor(train_sentences, word2Idx, label2Idx)
+  if use_embeddings:
+      word_embeddings, word2Idx, label2Idx, idx2Label = prepare_embeddings(
+            train_sentences, 
+            embeddings_dim=200, 
+            embeddings_path='embeddings/BioWordVec_PubMed_MIMICIII_d200.vec.bin')
+   
+      model = BiLSTM(
+          vocab_size=len(word2Idx),
+          word_embeddings=torch.FloatTensor(word_embeddings).to(device), 
+          use_pretrained_embeddings=True,
+          num_classes=len(label2Idx)).to(device)
+  else:
+     word2Idx, label2Idx, idx2Label = prepare_indices(train_sentences)
+     model = BiLSTM(
+          vocab_size=len(word2Idx),
+          use_pretrained_embeddings=False,
+          num_classes=len(label2Idx)).to(device)
 
-  model = BiLSTM(
-      word_embeddings=torch.FloatTensor(word_embeddings).to(device), 
-      num_classes=len(label2Idx)).to(device)
+  X_train, Y_train = format_to_tensors(train_sentences, word2Idx, label2Idx, device)
 
+  num_classes = len(label2Idx)
   epochs = 100
   learning_rate = 0.015
   momentum = 0.9
+  batch_size = 100
 
   criterion = nn.CrossEntropyLoss()
   optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate, momentum=momentum)
   n_iter = 0
 
-  def predict_dataset(dataset, net):
-    all_true_labels = []
-    all_predicted_labels = []
-
-    for tokens, true_labels in dataset:
-        tokens = torch.LongTensor([tokens]).to(device)
-        true_labels = torch.LongTensor(true_labels).to(device)
-
-        predicted_labels = net(tokens)
-        predicted_labels = predicted_labels.argmax(axis=2).squeeze(dim=0)
-
-        for i in range(len(true_labels)):
-            all_true_labels.append(true_labels[i].item())
-            all_predicted_labels.append(predicted_labels[i].item())
-
-    return torch.LongTensor(all_true_labels), torch.LongTensor(all_predicted_labels)
-
   print("Training...")
 
   for epoch in range(epochs):  
         model.train()
-    
-        for tokens, true_labels in train_sentences:
-            tokens = torch.LongTensor([tokens]).to(device)
-            true_labels = torch.LongTensor(true_labels).to(device)
+
+        permutation = torch.randperm(X_train.size()[0])
+
+        for i in range(0, X_train.size()[0], batch_size):
             optimizer.zero_grad()
-            predicted_labels = model(tokens)
-            predicted_labels = predicted_labels.squeeze(dim=0)
-            loss = criterion(predicted_labels, true_labels)
+
+            indices = permutation[i:i+batch_size]
+            batch_x, batch_y = X_train[indices], Y_train[indices]
+
+            prediction = model(batch_x).reshape(-1, num_classes)
+            loss = criterion(prediction, batch_y.reshape(-1))
+
             loss.backward()
             optimizer.step()
 
             writer.add_scalar('Loss/train_step', loss, n_iter)
             n_iter += 1
-        
-
+       
         model.eval()
 
-        ground_truth, predictions = predict_dataset(train_sentences, model)
+        ground_truth = Y_train.reshape(-1)
+        predictions = model(X_train).argmax(dim=2).reshape(-1)
         true_positives = (ground_truth == predictions).sum().item()
         accuracy = true_positives / len(ground_truth)
         writer.add_scalar('Accuracy/All/train_epoch', accuracy, epoch) 
@@ -91,7 +92,10 @@ def main():
             indices_predicted_in_class = torch.where(predictions == label)[0]
             false_positives = (ground_truth[indices_predicted_in_class] != predictions[indices_predicted_in_class]).sum().item()
 
-            precision = true_positives / (true_positives + false_positives)
+            if true_positives + false_positives == 0:
+                precision = 0
+            else:
+                precision = true_positives / (true_positives + false_positives)
 
             f1_score = (2 * true_positives) / (2 * true_positives + false_positives + false_negatives)
 

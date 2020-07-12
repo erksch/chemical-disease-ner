@@ -1,4 +1,5 @@
 import time
+import torch
 import numpy as np
 import gensim
 from xml.dom import minidom
@@ -69,16 +70,29 @@ def process_dataset_xml(file_path):
 
     return all_sentences
 
-def prepare_embeddings(sentences, embeddings_path, embeddings_dim):
+def extract_words_and_labels(sentences):
     labels = set()
-    words = {}
+    words = set()
 
     print("Extracting words and labels...")
     for sentence in sentences:
         for token, label in sentence:
             labels.add(label)
-            words[token.lower()] = True
+            words.add(token.lower())
     print(f"Extracted {len(words)} words and {len(labels)} labels.")
+
+    return words, labels
+
+def prepare_indices(sentences):
+    words, labels = extract_words_and_labels(sentences)
+
+    # mapping for words
+    word2Idx = {}
+    word2Idx["PADDING_TOKEN"] = 0
+    word2Idx["UNKNOWN_TOKEN"] = 1
+
+    for word in words:
+        word2Idx[word] = len(word2Idx)
 
     # mapping for labels
     label2Idx = {}
@@ -87,8 +101,19 @@ def prepare_embeddings(sentences, embeddings_path, embeddings_dim):
     
     idx2Label = {v: k for k, v in label2Idx.items()}
 
-    # read GLoVE word embeddings
-    word2Idx = {}
+    return word2Idx, label2Idx, idx2Label
+
+
+def prepare_embeddings(sentences, embeddings_path, embeddings_dim):
+    words, labels = extract_words_and_labels(sentences)
+
+    label2Idx = {}
+    for label in labels:
+        label2Idx[label] = len(label2Idx)
+    
+    idx2Label = {v: k for k, v in label2Idx.items()}
+
+    word2Idx = {} 
     word_embeddings = []
 
     word2Idx["PADDING_TOKEN"] = 0
@@ -118,31 +143,38 @@ def prepare_embeddings(sentences, embeddings_path, embeddings_dim):
     
     return word_embeddings, word2Idx, label2Idx, idx2Label
 
-def format_to_tensor(sentences, word2Idx, label2Idx):
-    unknownIdx = word2Idx['UNKNOWN_TOKEN']
-    paddingIdx = word2Idx['PADDING_TOKEN']
+def format_to_tensors(sentences, word2Idx, label2Idx, device):
+    unknown_idx = word2Idx['UNKNOWN_TOKEN']
+    padding_idx = word2Idx['PADDING_TOKEN']
 
-    dataset = []
+    X = []
+    Y = []
 
-    wordCount = 0
-    unknownWordCount = 0
+    null_label = 'O'
+    max_sentence_length = 0
 
     for sentence in sentences:
-        wordIndices = []
-        labelIndices = []
+        max_sentence_length = max(max_sentence_length, len(sentence))
+
+    for sentence in sentences:
+        word_indices = []
+        label_indices = []
 
         for word, label in sentence:
-            wordCount += 1
             if word in word2Idx:
                 wordIdx = word2Idx[word]
             elif word.lower() in word2Idx:
                 wordIdx = word2Idx[word.lower()]
             else:
-                wordIdx = unknownIdx
-                unknownWordCount += 1
-            wordIndices.append(wordIdx)
-            labelIndices.append(label2Idx[label])
+                wordIdx = unknown_idx
+            word_indices.append(wordIdx)
+            label_indices.append(label2Idx[label])
 
-        dataset.append([wordIndices, labelIndices])
+        while len(word_indices) < max_sentence_length:
+            word_indices.append(padding_idx)
+            label_indices.append(label2Idx[null_label])
 
-    return dataset
+        X.append(word_indices)
+        Y.append(label_indices)
+
+    return torch.LongTensor(X).to(device), torch.LongTensor(Y).to(device)
