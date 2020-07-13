@@ -95,40 +95,41 @@ def main():
 
         model.eval()
 
-        eval_start = time.time()
+        with torch.no_grad():
+            eval_start = time.time()
 
-        ground_truth, predictions = predict_dataset(X_train, Y_train, model)
-        true_positives = (ground_truth == predictions).sum().item()
-        accuracy = true_positives / len(ground_truth)
-        writer.add_scalar('Accuracy/All/train_epoch', accuracy, epoch) 
-        
-        print("Evaluation:")
-        
-        for label in idx2Label.keys():
-            indices_in_class = torch.where(ground_truth == label)[0]
-            true_positives = (ground_truth[indices_in_class] == predictions[indices_in_class]).sum().item()
-            false_negatives = len(indices_in_class) - true_positives
+            ground_truth, predictions = predict_dataset(X_train, Y_train, model)
+            true_positives = (ground_truth == predictions).sum().item()
+            accuracy = true_positives / len(ground_truth)
+            writer.add_scalar('Accuracy/All/train_epoch', accuracy, epoch)
             
-            recall = true_positives / len(indices_in_class)
+            print("Evaluation:")
             
-            indices_predicted_in_class = torch.where(predictions == label)[0]
-            false_positives = (ground_truth[indices_predicted_in_class] != predictions[indices_predicted_in_class]).sum().item()
+            for label in idx2Label.keys():
+                indices_in_class = torch.where(ground_truth == label)[0]
+                true_positives = (ground_truth[indices_in_class] == predictions[indices_in_class]).sum().item()
+                false_negatives = len(indices_in_class) - true_positives
+          
+                recall = true_positives / len(indices_in_class)
 
-            if true_positives + false_positives == 0:
-                precision = 0
-            else:
-                precision = true_positives / (true_positives + false_positives)
+                indices_predicted_in_class = torch.where(predictions == label)[0]
+                false_positives = (ground_truth[indices_predicted_in_class] != predictions[indices_predicted_in_class]).sum().item()
 
-            f1_score = (2 * true_positives) / (2 * true_positives + false_positives + false_negatives)
+                if true_positives + false_positives == 0:
+                    precision = 0
+                else:
+                    precision = true_positives / (true_positives + false_positives)
 
-            print(f"\t{idx2Label[label]:<8} | P {precision:.2f} | R {recall:.2f} | F1 {f1_score:.2f}")
+                f1_score = (2 * true_positives) / (2 * true_positives + false_positives + false_negatives)
 
-            writer.add_scalar(f"Precision/{idx2Label[label]}/train_epoch", precision, epoch)
-            writer.add_scalar(f"Recall/{idx2Label[label]}/train_epoch", recall, epoch)
-            writer.add_scalar(f"F1Score/{idx2Label[label]}/train_epoch", f1_score, epoch)
+                print(f"\t{idx2Label[label]:<8} | P {precision:.2f} | R {recall:.2f} | F1 {f1_score:.2f}")
 
-        eval_end = time.time()
-        print(f"\tEvaluation duration {(eval_end - eval_start):.2f}s")
+                writer.add_scalar(f"Precision/{idx2Label[label]}/train_epoch", precision, epoch)
+                writer.add_scalar(f"Recall/{idx2Label[label]}/train_epoch", recall, epoch)
+                writer.add_scalar(f"F1Score/{idx2Label[label]}/train_epoch", f1_score, epoch)
+
+            eval_end = time.time()
+            print(f"\tEvaluation duration {(eval_end - eval_start):.2f}s")
 
 if __name__ == '__main__':
     main()
