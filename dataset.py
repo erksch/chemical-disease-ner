@@ -3,16 +3,18 @@ from torch.utils.data import Dataset, Sampler
 
 class CDRDataset(Dataset):
 
-    def __init__(self, X, Y, pad_sentences=True):
+    def __init__(self, X, Y, word2Idx, label2Idx, pad_sentences=True):
         self.X = X
         self.Y = Y
+        self.word2Idx = word2Idx
+        self.label2Idx = label2Idx
         
         if pad_sentences:
             self._pad_sentences()
         
     def _pad_sentences(self):
-        pad_token = 1 # word2Idx['PADDING_TOKEN']
-        pad_label = 'O'
+        pad_token = self.word2Idx['PADDING_TOKEN']
+        pad_label = self.label2Idx['O']
         max_sentence_length = 0
 
         for sentence in self.X:
