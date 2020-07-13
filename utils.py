@@ -103,8 +103,7 @@ def prepare_indices(sentences):
 
     return word2Idx, label2Idx, idx2Label
 
-
-def prepare_embeddings(sentences, embeddings_path, embeddings_dim):
+def prepare_embeddings(sentences, embeddings_path):
     words, labels = extract_words_and_labels(sentences)
 
     label2Idx = {}
@@ -116,6 +115,13 @@ def prepare_embeddings(sentences, embeddings_path, embeddings_dim):
     word2Idx = {} 
     word_embeddings = []
 
+    print("Loading embeddings...") 
+    start = time.time()
+    embeddings = gensim.models.KeyedVectors.load_word2vec_format(embeddings_path, binary=True)
+    end = time.time()
+    print(f"Completed in {end - start} seconds.")
+    embeddings_dim = len(embeddings.wv[embeddings.vocab[0]])
+
     word2Idx["PADDING_TOKEN"] = 0
     vector = np.zeros(embeddings_dim)
     word_embeddings.append(vector)
@@ -124,12 +130,6 @@ def prepare_embeddings(sentences, embeddings_path, embeddings_dim):
     vector = np.random.uniform(-0.25, 0.25, embeddings_dim)
     word_embeddings.append(vector)
 
-    print("Loading embeddings...") 
-
-    start = time.time()
-    embeddings = gensim.models.KeyedVectors.load_word2vec_format(embeddings_path, binary=True)
-    end = time.time()
-    print(f"Completed in {end - start} seconds.")
 
     # loop through each word in embeddings
     for word in embeddings.vocab:
