@@ -17,9 +17,9 @@ def load_config():
     CONFIG = {}
 
     # data
-    CONFIG['train_set_path'] = configparser.getint('data', 'train_set')
-    CONFIG['dev_set_path'] = configparser.getint('data', 'dev_set')
-    CONFIG['test_set_path'] = configparser.getint('data', 'test_set')
+    CONFIG['train_set_path'] = configparser.get('data', 'train_set')
+    CONFIG['dev_set_path'] = configparser.get('data', 'dev_set')
+    CONFIG['test_set_path'] = configparser.get('data', 'test_set')
 
     # network
     CONFIG['hidden_dim'] = configparser.getint('network', 'hidden_dim')
@@ -38,6 +38,9 @@ def load_config():
     CONFIG['epochs'] = configparser.getint('training', 'epochs')
     CONFIG['learning_rate'] = configparser.getfloat('training', 'learning_rate')
     CONFIG['momentum'] = configparser.getfloat('training', 'momentum')
+    CONFIG['use_weighted_loss'] = configparser.getboolean('training', 'use_weighted_loss')
+    CONFIG['null_class_weight'] = configparser.getfloat('training', 'null_class_weight')
+    CONFIG['non_null_class_weight'] = configparser.getfloat('training', 'non_null_class_weight')
 
     # batching
     CONFIG['batch_mode'] = configparser.get('batching', 'batch_mode')
