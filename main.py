@@ -34,7 +34,9 @@ def main():
 
     CONFIG = load_config()
 
-    writer = SummaryWriter()
+    train_writer = SummaryWriter(comment='/train')
+    dev_writer = SummaryWriter(comment='/dev')
+    test_writer = SummaryWriter(comment='/test')
 
     print("Preprocessing data...")
     train_sentences = process_dataset_xml(CONFIG['train_set_path'])
@@ -58,6 +60,23 @@ def main():
     model = BiLSTM(CONFIG, vocab_size=vocab_size, num_classes=num_classes, **model_args).to(device)
 
     X_train, Y_train = text_to_indices(train_sentences, word2Idx, label2Idx)
+
+    print("Train dataset class distribution:")
+    total = len([token for sentence in Y_train for token in sentence])
+    weights = []
+    print(f"Total of {total} tokens")
+    for i, label in enumerate(label2Idx):
+        count = 0
+        for sentence in Y_train:
+            count += len(np.where(np.array(sentence) == label2Idx[label])[0])
+        end = ' | ' if i < len(label2Idx) -1 else ''
+        print(f"{label} {count} {count / total:.2f}", end=end)
+
+        weight = CONFIG['non_null_class_weight'] if (count / total) < 0.1 else CONFIG['null_class_weight']
+        weights.append(weight)
+    print()
+    print(f"Weights: {weights}")
+
     X_dev, Y_dev = text_to_indices(dev_sentences, word2Idx, label2Idx)
     X_test, Y_test = text_to_indices(test_sentences, word2Idx, label2Idx)
 
@@ -70,7 +89,8 @@ def main():
     elif CONFIG['batch_mode'] == 'by_sentence_length':
         dataloader = DataLoader(dataset, batch_sampler=UniqueSentenceLengthSampler(dataset))
 
-    criterion = nn.CrossEntropyLoss()
+    loss_args = { "weight": torch.FloatTensor(weights).to(device) } if CONFIG['use_weighted_loss'] else {}
+    criterion = nn.CrossEntropyLoss(**loss_args)
     optimizer = torch.optim.SGD(model.parameters(), lr=CONFIG['learning_rate'], momentum=CONFIG['momentum'])
     n_iter = 0
 
@@ -89,7 +109,7 @@ def main():
             loss.backward()
             optimizer.step()
 
-            writer.add_scalar('Loss/train_step', loss, n_iter)
+            train_writer.add_scalar('Loss/train_step', loss, n_iter)
             n_iter += 1
 
         epoch_end = time.time()
@@ -101,12 +121,12 @@ def main():
         with torch.no_grad():
             eval_total_start = time.time()
 
-            for set_name, X, Y in [('train', X_train, Y_train), ('dev', X_dev, Y_dev), ('test', X_test, Y_test)]:
+            for set_name, writer, X, Y in [('train', train_writer, X_train, Y_train), ('dev', dev_writer, X_dev, Y_dev), ('test', test_writer, X_test, Y_test)]:
                 eval_set_start = time.time()
                 ground_truth, predictions = predict_dataset(X, Y, model)
                 true_positives = (ground_truth == predictions).sum().item()
                 accuracy = true_positives / len(ground_truth)
-                writer.add_scalar(f"Total_Accuracy/{set_name}", accuracy, epoch + 1)
+                writer.add_scalar(f"Accuracy", accuracy, epoch + 1)
                 
                 print(f"{set_name} set evaluation:")
                 
@@ -129,9 +149,9 @@ def main():
 
                     print(f"\t{idx2Label[label]:<8} | P {precision:.2f} | R {recall:.2f} | F1 {f1_score:.2f}")
 
-                    writer.add_scalar(f"Precision/{idx2Label[label]}/{set_name}", precision, epoch + 1)
-                    writer.add_scalar(f"Recall/{idx2Label[label]}/{set_name}", recall, epoch + 1)
-                    writer.add_scalar(f"F1Score/{idx2Label[label]}/{set_name}", f1_score, epoch + 1)
+                    writer.add_scalar(f"Precision/{idx2Label[label]}", precision, epoch + 1)
+                    writer.add_scalar(f"Recall/{idx2Label[label]}", recall, epoch + 1)
+                    writer.add_scalar(f"F1Score/{idx2Label[label]}", f1_score, epoch + 1)
 
                 eval_set_end = time.time()
                 print(f"\tTook {(eval_set_end - eval_set_start):.2f}s")

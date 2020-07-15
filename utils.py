@@ -120,7 +120,7 @@ def prepare_embeddings(sentences, embeddings_path):
     embeddings = gensim.models.KeyedVectors.load_word2vec_format(embeddings_path, binary=True)
     end = time.time()
     print(f"Completed in {end - start} seconds.")
-    embeddings_dim = len(embeddings.wv[embeddings.vocab[0]])
+    embeddings_dim = len(embeddings.wv[list(embeddings.vocab.keys())[0]])
 
     word2Idx["PADDING_TOKEN"] = 0
     vector = np.zeros(embeddings_dim)
