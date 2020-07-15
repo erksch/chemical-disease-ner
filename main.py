@@ -37,9 +37,9 @@ def main():
     writer = SummaryWriter()
 
     print("Preprocessing data...")
-    train_sentences = process_dataset_xml('data/CDR_Data/CDR.Corpus.v010516/CDR_TrainingSet.BioC.xml')
-    # test_sentences = process_dataset_xml('data/CDR_Data/CDR.Corpus.v010516/CDR_TestSet.BioC.xml')
-    # dev_sentences = process_dataset_xml('data/CDR_Data/CDR.Corpus.v010516/CDR_DevelopmentSet.BioC.xml')
+    train_sentences = process_dataset_xml(CONFIG['train_set_path'])
+    dev_sentences = process_dataset_xml(CONFIG['dev_set_path'])
+    test_sentences = process_dataset_xml(CONFIG['test_set_path'])
     print("Done.")
 
     model_args = {}
@@ -58,6 +58,9 @@ def main():
     model = BiLSTM(CONFIG, vocab_size=vocab_size, num_classes=num_classes, **model_args).to(device)
 
     X_train, Y_train = text_to_indices(train_sentences, word2Idx, label2Idx)
+    X_dev, Y_dev = text_to_indices(dev_sentences, word2Idx, label2Idx)
+    X_test, Y_test = text_to_indices(test_sentences, word2Idx, label2Idx)
+
     dataset = CDRDataset(X_train, Y_train, word2Idx, label2Idx, pad_sentences=(CONFIG['batch_mode'] == 'padded_sentences'))
 
     if CONFIG['batch_mode'] == 'single':
@@ -91,45 +94,50 @@ def main():
 
         epoch_end = time.time()
 
-        print(f"Epoch {epoch} | Loss {loss.item():.2f} | Duration {(epoch_end - epoch_start):.2f}s")
+        print(f"Epoch {epoch + 1} | Loss {loss.item():.2f} | Duration {(epoch_end - epoch_start):.2f}s")
 
         model.eval()
 
         with torch.no_grad():
-            eval_start = time.time()
+            eval_total_start = time.time()
 
-            ground_truth, predictions = predict_dataset(X_train, Y_train, model)
-            true_positives = (ground_truth == predictions).sum().item()
-            accuracy = true_positives / len(ground_truth)
-            writer.add_scalar('Accuracy/All/train_epoch', accuracy, epoch)
+            for set_name, X, Y in [('train', X_train, Y_train), ('dev', X_dev, Y_dev), ('test', X_test, Y_test)]:
+                eval_set_start = time.time()
+                ground_truth, predictions = predict_dataset(X, Y, model)
+                true_positives = (ground_truth == predictions).sum().item()
+                accuracy = true_positives / len(ground_truth)
+                writer.add_scalar(f"Total_Accuracy/{set_name}", accuracy, epoch + 1)
+                
+                print(f"{set_name} set evaluation:")
+                
+                for label in idx2Label.keys():
+                    indices_in_class = torch.where(ground_truth == label)[0]
+                    true_positives = (ground_truth[indices_in_class] == predictions[indices_in_class]).sum().item()
+                    false_negatives = len(indices_in_class) - true_positives
             
-            print("Evaluation:")
-            
-            for label in idx2Label.keys():
-                indices_in_class = torch.where(ground_truth == label)[0]
-                true_positives = (ground_truth[indices_in_class] == predictions[indices_in_class]).sum().item()
-                false_negatives = len(indices_in_class) - true_positives
-          
-                recall = true_positives / len(indices_in_class)
+                    recall = true_positives / len(indices_in_class)
 
-                indices_predicted_in_class = torch.where(predictions == label)[0]
-                false_positives = (ground_truth[indices_predicted_in_class] != predictions[indices_predicted_in_class]).sum().item()
+                    indices_predicted_in_class = torch.where(predictions == label)[0]
+                    false_positives = (ground_truth[indices_predicted_in_class] != predictions[indices_predicted_in_class]).sum().item()
 
-                if true_positives + false_positives == 0:
-                    precision = 0
-                else:
-                    precision = true_positives / (true_positives + false_positives)
+                    if true_positives + false_positives == 0:
+                        precision = 0
+                    else:
+                        precision = true_positives / (true_positives + false_positives)
 
-                f1_score = (2 * true_positives) / (2 * true_positives + false_positives + false_negatives)
+                    f1_score = (2 * true_positives) / (2 * true_positives + false_positives + false_negatives)
 
-                print(f"\t{idx2Label[label]:<8} | P {precision:.2f} | R {recall:.2f} | F1 {f1_score:.2f}")
+                    print(f"\t{idx2Label[label]:<8} | P {precision:.2f} | R {recall:.2f} | F1 {f1_score:.2f}")
 
-                writer.add_scalar(f"Precision/{idx2Label[label]}/train_epoch", precision, epoch)
-                writer.add_scalar(f"Recall/{idx2Label[label]}/train_epoch", recall, epoch)
-                writer.add_scalar(f"F1Score/{idx2Label[label]}/train_epoch", f1_score, epoch)
+                    writer.add_scalar(f"Precision/{idx2Label[label]}/{set_name}", precision, epoch + 1)
+                    writer.add_scalar(f"Recall/{idx2Label[label]}/{set_name}", recall, epoch + 1)
+                    writer.add_scalar(f"F1Score/{idx2Label[label]}/{set_name}", f1_score, epoch + 1)
 
-            eval_end = time.time()
-            print(f"\tEvaluation duration {(eval_end - eval_start):.2f}s")
+                eval_set_end = time.time()
+                print(f"\tTook {(eval_set_end - eval_set_start):.2f}s")
+
+            eval_total_end = time.time()
+            print(f"\Total evaluation duration {(eval_total_end - eval_total_start):.2f}s")
 
 if __name__ == '__main__':
     main()

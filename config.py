@@ -16,6 +16,11 @@ def load_config():
 
     CONFIG = {}
 
+    # data
+    CONFIG['train_set_path'] = configparser.getint('data', 'train_set')
+    CONFIG['dev_set_path'] = configparser.getint('data', 'dev_set')
+    CONFIG['test_set_path'] = configparser.getint('data', 'test_set')
+
     # network
     CONFIG['hidden_dim'] = configparser.getint('network', 'hidden_dim')
     CONFIG['dropout'] = configparser.getfloat('network', 'dropout')
