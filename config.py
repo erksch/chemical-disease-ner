@@ -2,7 +2,7 @@ import os
 from configparser import ConfigParser
 from argparse import ArgumentParser
 
-def load_config():
+def load_config(hyperparams={}):
     configparser = ConfigParser()
     argparser = ArgumentParser()
     argparser.add_argument('--config', required=True, help='Path to config file')
@@ -15,6 +15,11 @@ def load_config():
     configparser.read(args.config)
 
     CONFIG = {}
+
+    #hyperopt
+    if configparser.get('hyperopt', 'optimize_hyperparameters'):
+        return hyperparams
+
 
     # data
     CONFIG['train_set_path'] = configparser.get('data', 'train_set')

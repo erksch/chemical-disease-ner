@@ -56,6 +56,7 @@ def main():
     
     vocab_size = len(word2Idx)
     num_classes = len(label2Idx)
+    f1_scores = {label: 0.0 for label in idx2Label.keys()}
 
     model = BiLSTM(CONFIG, vocab_size=vocab_size, num_classes=num_classes, **model_args).to(device)
 
@@ -146,6 +147,7 @@ def main():
                         precision = true_positives / (true_positives + false_positives)
 
                     f1_score = (2 * true_positives) / (2 * true_positives + false_positives + false_negatives)
+                    f1_scores[label] = f1_score
 
                     print(f"\t{idx2Label[label]:<8} | P {precision:.2f} | R {recall:.2f} | F1 {f1_score:.2f}")
 
@@ -158,6 +160,9 @@ def main():
 
             eval_total_end = time.time()
             print(f"\Total evaluation duration {(eval_total_end - eval_total_start):.2f}s")
+
+    f1_mean = (f1_scores[label2Idx['Disease']] + f1_scores[label2Idx['Chemical']]) / 2
+    return f1_mean   
 
 if __name__ == '__main__':
     main()
