@@ -25,6 +25,7 @@ def load_config():
     CONFIG['hidden_dim'] = configparser.getint('network', 'hidden_dim')
     CONFIG['dropout'] = configparser.getfloat('network', 'dropout')
     CONFIG['use_dropout'] = configparser.getboolean('network', 'use_dropout')
+    CONFIG['use_additional_linear_layers'] = configparser.getboolean('network', 'use_additional_linear_layers')
 
     # embeddings
     CONFIG['use_pretrained_embeddings'] = configparser.getboolean('embeddings', 'use_pretrained_embeddings')
