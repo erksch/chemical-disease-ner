@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 class BiLSTM(nn.Module):
     
@@ -32,8 +33,8 @@ class BiLSTM(nn.Module):
         if self.use_dropout:
             x = self.dropout(x)
         if self.use_additional_linear_layers:
-            x = nn.ReLU(self.linear1(x))
-            x = nn.ReLU(self.linear2(x))
+            x = F.relu(self.linear1(x))
+            x = F.relu(self.linear2(x))
             x = self.linear3(x)
         else: 
             x = self.linear(x)
