@@ -1,3 +1,5 @@
+import os.path
+import pickle
 from hyperopt import hp, fmin, rand, tpe, space_eval, tpe, Trials
 from main import main
 
@@ -38,13 +40,26 @@ hyperparameter_space = {
     'batch_mode': 'padded_sentences',
     'padded_sentences_batch_size': hp.quniform('padded_sentences_batch_size', 10, 1000, 10)
 }
-from hyperopt.pyll.stochastic import sample
 
+def optimize_hyperparams():
+    if os.path.isfile('./trials.p'):
+        trials = pickle.load(open('./trials.p', 'rb'))
+    else:
+        trials = Trials()
 
-    
-normal = sample(hyperparameter_space)
-print(normal)
-#def evaluate_model(args):
+    for i in range(100):
+        best_model = fmin(
+            fn=main,
+            space=hyperparameter_space,
+            algo=tpe.suggest,
+            trials=trials,
+            max_evals=len(trials.trials)+1
+        )
+        pickle.dump(trials, open('./trials.p', 'wb'))
 
-#def optimize_hyperparams():
- 
+    print('best model:')
+    print(best_model)
+    return best_model
+
+if __name__ == '__main__':
+    optimize_hyperparams()
