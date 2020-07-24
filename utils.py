@@ -133,7 +133,7 @@ def prepare_embeddings(sentences, embeddings_path):
 
     # loop through each word in embeddings
     for word in embeddings.vocab:
-        if word.lower() in words:
+        if word not in word2Idx:
             vector = embeddings.wv[word]
             word_embeddings.append(vector)
             word2Idx[word] = len(word2Idx)
