@@ -7,7 +7,7 @@ class BiLSTM(nn.Module):
         super(BiLSTM, self).__init__()
         
         self.use_dropout = CONFIG['use_dropout']
-        self.use_additional_linear_layers = CONFIG.['use_additional_linear_layers']
+        self.use_additional_linear_layers = CONFIG['use_additional_linear_layers']
 
         if CONFIG['use_pretrained_embeddings']:            
             self.embedding_dim = word_embeddings.shape[1] 
@@ -20,13 +20,11 @@ class BiLSTM(nn.Module):
         self.lstm = nn.LSTM(self.embedding_dim, CONFIG['hidden_dim'], bidirectional=True)
         
         # optional additional hidden Layers
-        
-        self.linear1 = nn.Sequential(nn.Linear(CONFIG['hidden_dim'] * 2, CONFIG['hidden_dim']),nn.Sigmoid())
-        self.linear2 = nn.Sequential(nn.Linear(CONFIG['hidden_dim'] , num_classes * 10),nn.Sigmoid())
-        self.linear3 = nn.Linear(num_classes * 10, num_classes)
+        self.linear1 = nn.Linear(CONFIG['hidden_dim'] * 2, CONFIG['hidden_dim'])
+        self.linear2 = nn.Linear(CONFIG['hidden_dim'] , 64)
+        self.linear3 = nn.Linear(64, num_classes)
             
         self.linear = nn.Linear(CONFIG['hidden_dim'] * 2, num_classes)
-
 
     def forward(self, x):
         x = self.embedding(x)
@@ -34,8 +32,8 @@ class BiLSTM(nn.Module):
         if self.use_dropout:
             x = self.dropout(x)
         if self.use_additional_linear_layers:
-            x = self.linear1(x)
-            x = self.linear2(x)
+            x = nn.ReLU(self.linear1(x))
+            x = nn.ReLU(self.linear2(x))
             x = self.linear3(x)
         else: 
             x = self.linear(x)
