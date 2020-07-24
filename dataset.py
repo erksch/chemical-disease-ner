@@ -3,11 +3,12 @@ from torch.utils.data import Dataset, Sampler
 
 class CDRDataset(Dataset):
 
-    def __init__(self, X, Y, word2Idx, label2Idx, pad_sentences=True):
+    def __init__(self, X, Y, word2Idx, label2Idx, pad_sentences=True, pad_sentences_max_length=-1):
         self.X = X
         self.Y = Y
         self.word2Idx = word2Idx
         self.label2Idx = label2Idx
+        self.max_length = pad_sentences_max_length
         
         if pad_sentences:
             self._pad_sentences()
@@ -15,15 +16,19 @@ class CDRDataset(Dataset):
     def _pad_sentences(self):
         pad_token = self.word2Idx['PADDING_TOKEN']
         pad_label = self.label2Idx['O']
-        max_sentence_length = 0
 
-        for sentence in self.X:
-            max_sentence_length = max(max_sentence_length, len(sentence))
+        if self.max_length == -1:
+            for sentence in self.X:
+                self.max_length = max(self.max_length, len(sentence))
 
-        print(f"Padding sentences to length {max_sentence_length} with padding token {pad_token}.")
+        print(f"Padding sentences to length {self.max_length} with padding token {pad_token}.")
 
         for i, sentence in enumerate(self.X):
-            while len(sentence) < max_sentence_length:
+            if len(sentence) > self.max_length:
+                self.X[i] = self.X[i][:self.max_length]
+                self.Y[i] = self.Y[i][:self.max_length]
+
+            while len(sentence) < self.max_length:
                 self.X[i].append(pad_token)
                 self.Y[i].append(pad_label)
 

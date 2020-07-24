@@ -81,7 +81,12 @@ def main(hyperparams={}):
     X_dev, Y_dev = text_to_indices(dev_sentences, word2Idx, label2Idx)
     X_test, Y_test = text_to_indices(test_sentences, word2Idx, label2Idx)
 
-    dataset = CDRDataset(X_train, Y_train, word2Idx, label2Idx, pad_sentences=(CONFIG['batch_mode'] == 'padded_sentences'))
+    if CONFIG['batch_mode'] == 'padded_sentences':
+        dataset_args = { 'pad_sentences': True, 'pad_sentences_max_length': CONFIG['padded_sentences_max_length'] }
+    else:
+        dataset_args = {}
+
+    dataset = CDRDataset(X_train, Y_train, word2Idx, label2Idx, **dataset_args)
 
     if CONFIG['batch_mode'] == 'single':
         dataloader = DataLoader(dataset, batch_size=1, shuffle=True)
@@ -129,7 +134,7 @@ def main(hyperparams={}):
         if CONFIG['evaluate_only_at_end']:
             should_evaluate = (epoch + 1) == CONFIG['epochs']
         else:
-            should_evaluate = epoch % CONFIG['evaluation_interval'] == 0
+            should_evaluate = (epoch + 1) == CONFIG['epochs'] or epoch % CONFIG['evaluation_interval'] == 0
 
         if should_evaluate:
             model.eval()

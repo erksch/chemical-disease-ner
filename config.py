@@ -77,6 +77,7 @@ def load_config(hyperparams={}):
     CONFIG['batch_mode'] = configparser.get('batching', 'batch_mode')
     if CONFIG['batch_mode'] == 'padded_sentences':
         CONFIG['padded_sentences_batch_size'] = configparser.getint('batching', 'padded_sentences_batch_size') 
+        CONFIG['padded_sentences_max_length'] = configparser.getint('batching', 'padded_sentences_max_length')
 
     # evaluation
     CONFIG['evaluation_interval'] = configparser.getint('evaluation', 'interval')
