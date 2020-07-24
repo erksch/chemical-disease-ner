@@ -20,7 +20,7 @@ hyperparameter_space = {
         {'use_pretrained_embeddings': True, 'pretrained_embeddings_path': 'embeddings/BioWordVec_PubMed_MIMICIII_d200.vec.bin'}
     ]),
 
-    'epochs': hp.quniform('hidden_dim', 1, 1000, 10),
+    'epochs': hp.quniform('epochs', 1, 1000, 10),
     'learning_rate': hp.uniform('learning_rate', 0.00001, 0.1),
     'momentum': hp.uniform('momentum', 0.0, 1.0),
 
