@@ -1,5 +1,5 @@
 numpy
 nltk
 gensim
-pytorch
+torch
 hyperopt
