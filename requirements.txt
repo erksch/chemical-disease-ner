@@ -2,3 +2,4 @@ numpy
 nltk
 gensim
 pytorch
+hyperopt

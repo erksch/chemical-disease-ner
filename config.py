@@ -2,6 +2,29 @@ import os
 from configparser import ConfigParser
 from argparse import ArgumentParser
 
+def decorate_hyperparams(hyperparams):
+    decorated_params =  {
+        **hyperparams, 
+        **hyperparams['hyperopt_use_dropout'],
+        **hyperparams['hyperopt_use_pretrained_embeddings'],
+        **hyperparams['hyperopt_use_weighted_loss']
+
+    }
+    del decorated_params['hyperopt_use_dropout']
+    del decorated_params['hyperopt_use_pretrained_embeddings']
+    del decorated_params['hyperopt_use_weighted_loss']
+
+    decorated_params['hidden_dim'] = int(decorated_params['hidden_dim'])
+    if 'embeddings_dim' in decorated_params:
+        decorated_params['embeddings_dim'] = int(decorated_params['embeddings_dim'])
+    decorated_params['epochs'] = int(decorated_params['epochs'])
+    decorated_params['padded_sentences_batch_size'] = int(decorated_params['padded_sentences_batch_size'])
+
+    decorated_params['optimize_hyperparameters'] = True
+    
+    return decorated_params
+
+
 def load_config(hyperparams={}):
     configparser = ConfigParser()
     argparser = ArgumentParser()
@@ -17,9 +40,10 @@ def load_config(hyperparams={}):
     CONFIG = {}
 
     #hyperopt
-    if configparser.get('hyperopt', 'optimize_hyperparameters'):
-        return hyperparams
-
+    if configparser.getboolean('hyperopt', 'optimize_hyperparameters'):
+        return decorate_hyperparams(hyperparams)
+    else:
+        CONFIG['optimize_hyperparameters'] = configparser.getboolean('hyperopt', 'optimize_hyperparameters')
 
     # data
     CONFIG['train_set_path'] = configparser.get('data', 'train_set')
