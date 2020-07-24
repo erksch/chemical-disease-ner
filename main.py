@@ -92,7 +92,16 @@ def main(hyperparams={}):
 
     loss_args = { "weight": torch.FloatTensor(weights).to(device) } if CONFIG['use_weighted_loss'] else {}
     criterion = nn.CrossEntropyLoss(**loss_args)
-    optimizer = torch.optim.SGD(model.parameters(), lr=CONFIG['learning_rate'], momentum=CONFIG['momentum'])
+
+    if CONFIG['optimizer'] == 'adam':
+        print(f"Using Adam optimizer with learning rate {CONFIG['learning_rate']}")
+        optimizer = torch.optim.Adam(model.parameters(), lr=CONFIG['learning_rate'])
+    elif CONFIG['optimizer'] == 'sgd':
+        print(f"Using SGD optimizer with learning rate {CONFIG['learning_rate']} and momentum {CONFIG['momentum']}")
+        optimizer = torch.optim.SGD(model.parameters(), lr=CONFIG['learning_rate'], momentum=CONFIG['momentum'])
+    else:
+        raise Error("No optimizer specified")
+
     n_iter = 0
 
     print("Training...")
@@ -117,7 +126,12 @@ def main(hyperparams={}):
 
         print(f"Epoch {epoch + 1} | Loss {loss.item():.2f} | Duration {(epoch_end - epoch_start):.2f}s")
 
-        if (epoch+1 == CONFIG['epochs']) or not CONFIG['optimize_hyperparameters']:
+        if CONFIG['evaluate_only_at_end']:
+            should_evaluate = (epoch + 1) == CONFIG['epochs']
+        else:
+            should_evaluate = epoch % CONFIG['evaluation_interval'] == 0
+
+        if should_evaluate:
             model.eval()
 
             with torch.no_grad():

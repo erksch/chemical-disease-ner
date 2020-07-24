@@ -66,8 +66,9 @@ def load_config(hyperparams={}):
         
     # training
     CONFIG['epochs'] = configparser.getint('training', 'epochs')
+    CONFIG['optimizer'] = configparser.get('training', 'optimizer')
     CONFIG['learning_rate'] = configparser.getfloat('training', 'learning_rate')
-    CONFIG['momentum'] = configparser.getfloat('training', 'momentum')
+    CONFIG['momentum'] = configparser.getfloat('training', 'sgd_momentum')
     CONFIG['use_weighted_loss'] = configparser.getboolean('training', 'use_weighted_loss')
     CONFIG['null_class_weight'] = configparser.getfloat('training', 'null_class_weight')
     CONFIG['non_null_class_weight'] = configparser.getfloat('training', 'non_null_class_weight')
@@ -76,5 +77,9 @@ def load_config(hyperparams={}):
     CONFIG['batch_mode'] = configparser.get('batching', 'batch_mode')
     if CONFIG['batch_mode'] == 'padded_sentences':
         CONFIG['padded_sentences_batch_size'] = configparser.getint('batching', 'padded_sentences_batch_size') 
+
+    # evaluation
+    CONFIG['evaluation_interval'] = configparser.getint('evaluation', 'interval')
+    CONFIG['evaluate_only_at_end'] = configparser.getboolean('evaluation', 'only_at_end')
     
     return CONFIG
