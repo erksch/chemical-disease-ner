@@ -47,12 +47,12 @@ def main(hyperparams={}):
     model_args = {}
     
     if CONFIG['use_pretrained_embeddings']:
-        word_embeddings, word2Idx, label2Idx, idx2Label = prepare_embeddings(
+        word_embeddings, word2Idx, char2Idx, label2Idx, idx2Label = prepare_embeddings(
             [train_sentences, dev_sentences, test_sentences], 
             embeddings_path=CONFIG['pretrained_embeddings_path'])
         model_args = { 'word_embeddings': torch.FloatTensor(word_embeddings).to(device) }
     else:
-        word2Idx, label2Idx, idx2Label = prepare_indices([train_sentences, dev_sentences, test_sentences])
+        word2Idx, char2Idx, label2Idx, idx2Label = prepare_indices([train_sentences, dev_sentences, test_sentences])
     
     vocab_size = len(word2Idx)
     num_classes = len(label2Idx)
@@ -60,7 +60,7 @@ def main(hyperparams={}):
 
     model = BiLSTM(CONFIG, vocab_size=vocab_size, num_classes=num_classes, **model_args).to(device)
 
-    X_train, Y_train = text_to_indices(train_sentences, word2Idx, label2Idx)
+    X_train, Y_train = text_to_indices(train_sentences, word2Idx, char2Idx, label2Idx)
 
     print("Train dataset class distribution:")
     total = len([token for sentence in Y_train for token in sentence])
@@ -118,7 +118,8 @@ def main(hyperparams={}):
         for batch_x, batch_y in dataloader:
             optimizer.zero_grad()
 
-            prediction = model(batch_x).reshape(-1, num_classes)
+            batch_x_tokens, batch_x_chars = batch_x
+            prediction = model(batch_x_tokens, batch_x_chars).reshape(-1, num_classes)
             loss = criterion(prediction, batch_y.reshape(-1))
 
             loss.backward()
@@ -131,6 +132,7 @@ def main(hyperparams={}):
 
         print(f"Epoch {epoch + 1} | Loss {loss.item():.2f} | Duration {(epoch_end - epoch_start):.2f}s")
 
+        """
         if CONFIG['evaluate_only_at_end']:
             should_evaluate = (epoch + 1) == CONFIG['epochs']
         else:
@@ -180,9 +182,9 @@ def main(hyperparams={}):
 
                 eval_total_end = time.time()
                 print(f"\Total evaluation duration {(eval_total_end - eval_total_start):.2f}s")
-
-    f1_mean = (f1_scores[label2Idx['Disease']] + f1_scores[label2Idx['Chemical']]) / 2
-    return -f1_mean   
+        """
+    #f1_mean = (f1_scores[label2Idx['Disease']] + f1_scores[label2Idx['Chemical']]) / 2
+    #return -f1_mean   
 
 if __name__ == '__main__':
     main()
