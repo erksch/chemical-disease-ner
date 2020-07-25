@@ -48,11 +48,11 @@ def main(hyperparams={}):
     
     if CONFIG['use_pretrained_embeddings']:
         word_embeddings, word2Idx, label2Idx, idx2Label = prepare_embeddings(
-            train_sentences, 
+            [train_sentences, dev_sentences, test_sentences], 
             embeddings_path=CONFIG['pretrained_embeddings_path'])
         model_args = { 'word_embeddings': torch.FloatTensor(word_embeddings).to(device) }
     else:
-        word2Idx, label2Idx, idx2Label = prepare_indices(train_sentences)
+        word2Idx, label2Idx, idx2Label = prepare_indices([train_sentences, dev_sentences, test_sentences])
     
     vocab_size = len(word2Idx)
     num_classes = len(label2Idx)

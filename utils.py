@@ -70,28 +70,29 @@ def process_dataset_xml(file_path):
 
     return all_sentences
 
-def extract_words_and_labels(sentences):
+def extract_words_and_labels(datasets):
     labels = set()
     words = set()
 
     print("Extracting words and labels...")
-    for sentence in sentences:
-        for token, label in sentence:
-            labels.add(label)
-            words.add(token.lower())
+    for dataset in datasets
+        for sentence in dataset:
+            for token, label in sentence:
+                labels.add(label)
+                words.add(token.lower())
     print(f"Extracted {len(words)} words and {len(labels)} labels.")
 
     return words, labels
 
-def prepare_indices(sentences):
-    words, labels = extract_words_and_labels(sentences)
+def prepare_indices(datasets):
+    dataset_vocab, labels = extract_words_and_labels(datasets)
 
     # mapping for words
     word2Idx = {}
     word2Idx["PADDING_TOKEN"] = 0
     word2Idx["UNKNOWN_TOKEN"] = 1
 
-    for word in words:
+    for word in dataset_vocab:
         word2Idx[word] = len(word2Idx)
 
     # mapping for labels
@@ -103,8 +104,8 @@ def prepare_indices(sentences):
 
     return word2Idx, label2Idx, idx2Label
 
-def prepare_embeddings(sentences, embeddings_path):
-    words, labels = extract_words_and_labels(sentences)
+def prepare_embeddings(datasets, embeddings_path):
+    dataset_vocab, labels = extract_words_and_labels(datasets)
 
     label2Idx = {}
     for label in labels:
@@ -130,16 +131,14 @@ def prepare_embeddings(sentences, embeddings_path):
     vector = np.random.uniform(-0.25, 0.25, embeddings_dim)
     word_embeddings.append(vector)
 
-
-    # loop through each word in embeddings
     for word in embeddings.vocab:
-        if word not in word2Idx:
+        if word in dataset_vocab:
             vector = embeddings.wv[word]
             word_embeddings.append(vector)
             word2Idx[word] = len(word2Idx)
 
     word_embeddings = np.array(word_embeddings)
-    print(f"Found embeddings for {word_embeddings.shape[0]} of {len(words)} words.")
+    print(f"Found embeddings for {word_embeddings.shape[0]} of {len(dataset_vocab)} words.")
     
     return word_embeddings, word2Idx, label2Idx, idx2Label
 
