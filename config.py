@@ -19,6 +19,7 @@ def decorate_hyperparams(hyperparams):
         decorated_params['embeddings_dim'] = int(decorated_params['embeddings_dim'])
     decorated_params['epochs'] = int(decorated_params['epochs'])
     decorated_params['padded_sentences_batch_size'] = int(decorated_params['padded_sentences_batch_size'])
+    decorated_params['padded_sentences_max_length'] = int(decorated_params['padded_sentences_max_length'])
 
     decorated_params['optimize_hyperparameters'] = True
     

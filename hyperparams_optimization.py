@@ -39,6 +39,7 @@ hyperparameter_space = {
 
     'batch_mode': 'padded_sentences',
     'padded_sentences_batch_size': hp.quniform('padded_sentences_batch_size', 10, 500, 10),
+    'padded_sentences_max_length': hp.quniform('padded_sentences_max_length', 10, 100),
 
     'evaluate_only_at_end': True
 }
