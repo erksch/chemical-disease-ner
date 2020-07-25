@@ -23,6 +23,7 @@ hyperparameter_space = {
     'epochs': hp.quniform('epochs', 1, 1000, 10),
     'learning_rate': hp.uniform('learning_rate', 0.00001, 0.1),
     'momentum': hp.uniform('momentum', 0.0, 1.0),
+    'optimizer': hp.choice('optimizer', ['sgd', 'adam']),
 
     'hyperopt_use_weighted_loss': hp.choice('hyperopt_use_weighted_loss', [
         {
@@ -39,10 +40,9 @@ hyperparameter_space = {
 
     'batch_mode': 'padded_sentences',
     'padded_sentences_batch_size': hp.quniform('padded_sentences_batch_size', 10, 500, 10),
-    
-    'padded_sentences_max_length': 20,
-    'evaluate_only_at_end': True,
-    'optimizer': 'sgd'
+    'padded_sentences_max_length': hp.quniform('padded_sentences_batch_size', 10, 100),
+
+    'evaluate_only_at_end': True
 }
 
 def optimize_hyperparams():
