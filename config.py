@@ -41,7 +41,10 @@ def load_config(hyperparams={}):
 
     #hyperopt
     if configparser.getboolean('hyperopt', 'optimize_hyperparameters'):
-        return decorate_hyperparams(hyperparams)
+        decorated_params =  decorate_hyperparams(hyperparams)
+        print('CONFIG:')
+        print(decorated_params)
+        return decorated_params
     else:
         CONFIG['optimize_hyperparameters'] = configparser.getboolean('hyperopt', 'optimize_hyperparameters')
 
