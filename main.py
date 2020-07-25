@@ -16,10 +16,11 @@ def predict_dataset(X, Y, net):
     all_predicted_labels = []
 
     for i, x in enumerate(X):
-        tokens = torch.LongTensor([x]).to(device)
+        tokens = torch.LongTensor([x[0]]).to(device)
+        chars = torch.LongTensor([x[1]]).to(device)
         true_labels = torch.LongTensor(Y[i]).to(device)
 
-        predicted_labels = net(tokens)
+        predicted_labels = net(tokens, chars)
         predicted_labels = predicted_labels.argmax(axis=2).squeeze(dim=0)
 
         for j in range(len(true_labels)):
@@ -47,20 +48,21 @@ def main(hyperparams={}):
     model_args = {}
     
     if CONFIG['use_pretrained_embeddings']:
-        word_embeddings, word2Idx, label2Idx, idx2Label = prepare_embeddings(
+        word_embeddings, word2Idx, char2Idx, label2Idx, idx2Label = prepare_embeddings(
             [train_sentences, dev_sentences, test_sentences], 
             embeddings_path=CONFIG['pretrained_embeddings_path'])
         model_args = { 'word_embeddings': torch.FloatTensor(word_embeddings).to(device) }
     else:
-        word2Idx, label2Idx, idx2Label = prepare_indices([train_sentences, dev_sentences, test_sentences])
+        word2Idx, char2Idx, label2Idx, idx2Label = prepare_indices([train_sentences, dev_sentences, test_sentences])
     
     vocab_size = len(word2Idx)
     num_classes = len(label2Idx)
+    num_chars = len(char2Idx)
     f1_scores = {label: 0.0 for label in idx2Label.keys()}
 
-    model = BiLSTM(CONFIG, vocab_size=vocab_size, num_classes=num_classes, **model_args).to(device)
+    model = BiLSTM(CONFIG, vocab_size=vocab_size, num_classes=num_classes, num_chars=num_chars, **model_args).to(device)
 
-    X_train, Y_train = text_to_indices(train_sentences, word2Idx, label2Idx)
+    X_train, Y_train = text_to_indices(train_sentences, word2Idx, char2Idx, label2Idx)
 
     print("Train dataset class distribution:")
     total = len([token for sentence in Y_train for token in sentence])
@@ -78,15 +80,15 @@ def main(hyperparams={}):
     print()
     print(f"Weights: {weights}")
 
-    X_dev, Y_dev = text_to_indices(dev_sentences, word2Idx, label2Idx)
-    X_test, Y_test = text_to_indices(test_sentences, word2Idx, label2Idx)
+    X_dev, Y_dev = text_to_indices(dev_sentences, word2Idx, char2Idx, label2Idx)
+    X_test, Y_test = text_to_indices(test_sentences, word2Idx, char2Idx, label2Idx)
 
     if CONFIG['batch_mode'] == 'padded_sentences':
         dataset_args = { 'pad_sentences': True, 'pad_sentences_max_length': CONFIG['padded_sentences_max_length'] }
     else:
         dataset_args = {}
 
-    dataset = CDRDataset(X_train, Y_train, word2Idx, label2Idx, **dataset_args)
+    dataset = CDRDataset(X_train, Y_train, word2Idx, char2Idx, label2Idx, **dataset_args)
 
     if CONFIG['batch_mode'] == 'single':
         dataloader = DataLoader(dataset, batch_size=1, shuffle=True)
@@ -115,10 +117,9 @@ def main(hyperparams={}):
         epoch_start = time.time()
         model.train()
 
-        for batch_x, batch_y in dataloader:
+        for batch_x_tokens, batch_x_chars, batch_y in dataloader:
             optimizer.zero_grad()
-
-            prediction = model(batch_x).reshape(-1, num_classes)
+            prediction = model(batch_x_tokens, batch_x_chars).reshape(-1, num_classes)
             loss = criterion(prediction, batch_y.reshape(-1))
 
             loss.backward()
@@ -142,7 +143,7 @@ def main(hyperparams={}):
             with torch.no_grad():
                 eval_total_start = time.time()
 
-                for set_name, writer, X, Y in [('train', train_writer, X_train, Y_train), ('dev', dev_writer, X_dev, Y_dev), ('test', test_writer, X_test, Y_test)]:
+                for set_name, writer, X, Y in [('train', train_writer, X_train, Y_train)]:#, ('dev', dev_writer, X_dev, Y_dev), ('test', test_writer, X_test, Y_test)]:
                     eval_set_start = time.time()
                     ground_truth, predictions = predict_dataset(X, Y, model)
                     true_positives = (ground_truth == predictions).sum().item()
@@ -180,9 +181,9 @@ def main(hyperparams={}):
 
                 eval_total_end = time.time()
                 print(f"\Total evaluation duration {(eval_total_end - eval_total_start):.2f}s")
-
-    f1_mean = (f1_scores[label2Idx['Disease']] + f1_scores[label2Idx['Chemical']]) / 2
-    return -f1_mean   
+    
+    #f1_mean = (f1_scores[label2Idx['Disease']] + f1_scores[label2Idx['Chemical']]) / 2
+    #return -f1_mean   
 
 if __name__ == '__main__':
     main()

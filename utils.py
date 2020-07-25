@@ -102,7 +102,11 @@ def prepare_indices(datasets):
     
     idx2Label = {v: k for k, v in label2Idx.items()}
 
-    return word2Idx, label2Idx, idx2Label
+    char2Idx = { 'PADDING': 0, 'UNKNOWN': 1 }
+    for c in " 0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ.,-_()[]{}!?:;#'\"/\\%$`&=*+@^~|<>":
+        char2Idx[c] = len(char2Idx)
+
+    return word2Idx, char2Idx, label2Idx, idx2Label
 
 def prepare_embeddings(datasets, embeddings_path):
     dataset_vocab, labels = extract_words_and_labels(datasets)
@@ -112,6 +116,10 @@ def prepare_embeddings(datasets, embeddings_path):
         label2Idx[label] = len(label2Idx)
     
     idx2Label = {v: k for k, v in label2Idx.items()}
+
+    char2Idx = { 'PADDING': 0, 'UNKNOWN': 1 }
+    for c in " 0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ.,-_()[]{}!?:;#'\"/\\%$`&=*+@^~|<>":
+       char2Idx[c] = len(char2Idx)
 
     word2Idx = {} 
     word_embeddings = []
@@ -140,11 +148,18 @@ def prepare_embeddings(datasets, embeddings_path):
     word_embeddings = np.array(word_embeddings)
     print(f"Found embeddings for {word_embeddings.shape[0]} of {len(dataset_vocab)} words.")
     
-    return word_embeddings, word2Idx, label2Idx, idx2Label
+    return word_embeddings, word2Idx, char2Idx, label2Idx, idx2Label
 
-def text_to_indices(sentences, word2Idx, label2Idx):
+def text_to_indices(sentences, word2Idx, char2Idx, label2Idx):
     unknown_idx = word2Idx['UNKNOWN_TOKEN']
-    padding_idx = word2Idx['PADDING_TOKEN']
+    char_padding_idx = char2Idx['PADDING']
+    token_max_length = -1
+    
+    for sentence in sentences:
+        for word, label in sentence:
+            token_max_length = max(token_max_length, len(word))
+
+    print(f"Padding char input to word length {token_max_length}.")
 
     X = []
     Y = []
@@ -154,6 +169,7 @@ def text_to_indices(sentences, word2Idx, label2Idx):
     for sentence in sentences:
         word_indices = []
         label_indices = []
+        char_indices = []
 
         for word, label in sentence:
             if word in word2Idx:
@@ -162,10 +178,16 @@ def text_to_indices(sentences, word2Idx, label2Idx):
                 wordIdx = word2Idx[word.lower()]
             else:
                 wordIdx = unknown_idx
+            
+            chars = [char2Idx[char] for char in word]
+            while len(chars) < token_max_length:
+                chars.append(char_padding_idx)
+            
             word_indices.append(wordIdx)
+            char_indices.append(chars)
             label_indices.append(label2Idx[label])
 
-        X.append(word_indices)
+        X.append([word_indices, char_indices])
         Y.append(label_indices)
 
     return X, Y
