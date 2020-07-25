@@ -9,20 +9,21 @@ class BiLSTM(nn.Module):
         
         self.use_dropout = CONFIG['use_dropout']
         self.use_additional_linear_layers = CONFIG['use_additional_linear_layers']
-
-        self.char_embedding = nn.Embedding(num_chars, 30)
-        self.conv1d = nn.Conv1d(30, 128, kernel_size=1, stride=1)
-        self.maxpool = nn.MaxPool1d(kernel_size=2, stride=2)
+    
+        self.char_embedding_dim = 30
+        self.char_embedding = nn.Embedding(num_chars, self.char_embedding_dim)
+        self.conv1d = nn.Conv2d(20, 20, kernel_size=(1, 1))
+        self.maxpool = nn.MaxPool2d(kernel_size=(49, 1), stride=1)
 
         if CONFIG['use_pretrained_embeddings']:            
             self.word_embedding_dim = word_embeddings.shape[1] 
             self.word_embedding = nn.Embedding.from_pretrained(word_embeddings)
         else:
             self.word_embedding_dim = CONFIG['embeddings_dim']
-            self.word_embedding = nn.Embedding(vocab_size, self.embedding_dim)
+            self.word_embedding = nn.Embedding(vocab_size, self.word_embedding_dim)
 
         self.dropout = nn.Dropout(CONFIG['dropout'])
-        self.lstm = nn.LSTM(self.embedding_dim, CONFIG['hidden_dim'], bidirectional=True)
+        self.lstm = nn.LSTM(self.word_embedding_dim + self.char_embedding_dim, CONFIG['hidden_dim'], bidirectional=True)
         
         # optional additional hidden Layers
         self.linear1 = nn.Linear(CONFIG['hidden_dim'] * 2, CONFIG['hidden_dim'])
@@ -33,14 +34,15 @@ class BiLSTM(nn.Module):
 
     def forward(self, xt, xc):
         # char input
-        xc = self.char_embedding(xc)    # (B, N, 30)
-        xc = F.relu(self.conv1d(xc))    # (B, N, 128)
-        xc = self.maxpool(xc)           # (B, N, 64)
+        xc = self.char_embedding(xc)    # (B, N, C, 30)
+        xc = self.conv1d(xc)    # (B, N, C, 128)
+        xc = self.maxpool(xc)           # (B, N, C, 64)
+        xc = xc.squeeze(dim=2)
 
         # word / token input
         xt = self.word_embedding(xt)    # (B, N, E)
 
-        x = torch.cat([xt, xc])         # (B, N, E + 64)
+        x = torch.cat((xt, xc), dim=2)         # (B, N, E + 64)
 
         x, _ = self.lstm(x)             # (B, N, 2*H)
 
