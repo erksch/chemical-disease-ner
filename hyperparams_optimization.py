@@ -38,7 +38,9 @@ hyperparameter_space = {
     ]),
 
     'batch_mode': 'padded_sentences',
-    'padded_sentences_batch_size': hp.quniform('padded_sentences_batch_size', 10, 1000, 10)
+    'padded_sentences_batch_size': hp.quniform('padded_sentences_batch_size', 10, 500, 10),
+
+    'evaluate_only_at_end': True
 }
 
 def optimize_hyperparams():
