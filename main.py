@@ -182,8 +182,8 @@ def main(hyperparams={}):
                 eval_total_end = time.time()
                 print(f"\Total evaluation duration {(eval_total_end - eval_total_start):.2f}s")
     
-    #f1_mean = (f1_scores[label2Idx['Disease']] + f1_scores[label2Idx['Chemical']]) / 2
-    #return -f1_mean   
+    f1_mean = (f1_scores[label2Idx['Disease']] + f1_scores[label2Idx['Chemical']]) / 2
+    return -f1_mean   
 
 if __name__ == '__main__':
     main()
