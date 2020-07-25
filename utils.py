@@ -111,7 +111,11 @@ def prepare_indices(datasets):
     
     idx2Label = {v: k for k, v in label2Idx.items()}
 
-    return word2Idx, label2Idx, idx2Label
+    char2Idx = { 'PADDING': 0, 'UNKNOWN': 1 }
+        for c in " 0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ.,-_()[]{}!?:;#'\"/\\%$`&=*+@^~|<>":
+            char2Idx[c] = len(char2Idx)
+
+    return word2Idx, char2Idx, label2Idx, idx2Label
 
 def prepare_embeddings(datasets, embeddings_path):
     dataset_vocab, labels = extract_words_and_labels(datasets)
@@ -121,6 +125,10 @@ def prepare_embeddings(datasets, embeddings_path):
         label2Idx[label] = len(label2Idx)
     
     idx2Label = {v: k for k, v in label2Idx.items()}
+
+    char2Idx = { 'PADDING': 0, 'UNKNOWN': 1 }
+        for c in " 0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ.,-_()[]{}!?:;#'\"/\\%$`&=*+@^~|<>":
+            char2Idx[c] = len(char2Idx)
 
     word2Idx = {} 
     word_embeddings = []
@@ -149,13 +157,14 @@ def prepare_embeddings(datasets, embeddings_path):
     word_embeddings = np.array(word_embeddings)
     print(f"Found embeddings for {word_embeddings.shape[0]} of {len(dataset_vocab)} words.")
     
-    return word_embeddings, word2Idx, label2Idx, idx2Label
+    return word_embeddings, word2Idx, char2Idx, label2Idx, idx2Label
 
-def text_to_indices(sentences, word2Idx, label2Idx):
+def text_to_indices(sentences, word2Idx, char2Idx, label2Idx):
     unknown_idx = word2Idx['UNKNOWN_TOKEN']
     padding_idx = word2Idx['PADDING_TOKEN']
 
-    X = []
+    X_tokens = []
+    X_chars = []
     Y = []
 
     null_label = 'O'
@@ -163,6 +172,7 @@ def text_to_indices(sentences, word2Idx, label2Idx):
     for sentence in sentences:
         word_indices = []
         label_indices = []
+        char_indices = []
 
         for word, label in sentence:
             if word in word2Idx:
@@ -171,11 +181,15 @@ def text_to_indices(sentences, word2Idx, label2Idx):
                 wordIdx = word2Idx[word.lower()]
             else:
                 wordIdx = unknown_idx
+            
+            chars = [char2Idx[char] for char in word]
             word_indices.append(wordIdx)
+            char_indices = chars
             label_indices.append(label2Idx[label])
 
-        X.append(word_indices)
+        X_tokens.append(word_indices)
+        X_chars.append(char_indices)
         Y.append(label_indices)
 
-    return X, Y
+    return [X_tokens, X_chars], Y
 
