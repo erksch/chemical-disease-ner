@@ -11,17 +11,29 @@ from model import BiLSTM
 
 device = torch.device('cuda')
 
-def predict_dataset(X, Y, net):
+def predict_dataset(X, Y, net, word2Idx, char2Idx, padded_sentence_length, padded_word_length):
+    padding_token = word2Idx['PADDING_TOKEN']
+    padding_char = char2Idx['PADDING']
+    padding_token_chars = [padding_char for i in range(padded_word_length)]
+
     all_true_labels = []
     all_predicted_labels = []
 
     for i, x in enumerate(X):
-        tokens = torch.LongTensor([x[0]]).to(device)
-        chars = torch.LongTensor([x[1]]).to(device)
-        true_labels = torch.LongTensor(Y[i]).to(device)
+        tokens, chars = x
+        true_labels = Y[i]
+
+        num_no_pad_tokens = len(tokens)
+        while len(tokens) < padded_sentence_length:
+            tokens.append(padding_token)
+            chars.append(padding_token_chars)
+
+        tokens = torch.LongTensor([tokens]).to(device)
+        chars = torch.LongTensor([chars]).to(device)
+        true_labels = torch.LongTensor(true_labels).to(device)
 
         predicted_labels = net(tokens, chars)
-        predicted_labels = predicted_labels.argmax(axis=2).squeeze(dim=0)
+        predicted_labels = predicted_labels.argmax(axis=2).squeeze(dim=0)[:num_no_pad_tokens]
 
         for j in range(len(true_labels)):
             all_true_labels.append(true_labels[j].item())
@@ -63,7 +75,7 @@ def main(hyperparams={}):
 
     model = BiLSTM(CONFIG, vocab_size=vocab_size, num_classes=num_classes, num_chars=num_chars, **model_args).to(device)
 
-    X_train, Y_train = text_to_indices(train_sentences, word2Idx, char2Idx, label2Idx)
+    X_train, Y_train = text_to_indices(train_sentences, word2Idx, char2Idx, label2Idx, pad_chars_to=71)
 
     print("Train dataset class distribution:")
     total = len([token for sentence in Y_train for token in sentence])
@@ -80,11 +92,11 @@ def main(hyperparams={}):
         weights.append(weight)
     print()
 
-    X_dev, Y_dev = text_to_indices(dev_sentences, word2Idx, char2Idx, label2Idx)
-    X_test, Y_test = text_to_indices(test_sentences, word2Idx, char2Idx, label2Idx)
+    X_dev, Y_dev = text_to_indices(dev_sentences, word2Idx, char2Idx, label2Idx, pad_chars_to=71)
+    X_test, Y_test = text_to_indices(test_sentences, word2Idx, char2Idx, label2Idx, pad_chars_to=71)
 
     if CONFIG['batch_mode'] == 'padded_sentences':
-        dataset_args = { 'pad_sentences': True, 'pad_sentences_max_length': CONFIG['padded_sentences_max_length'] }
+        dataset_args = { 'pad_sentences': True, 'pad_sentences_max_length': 208 }
     else:
         dataset_args = { 'pad_sentences': False }
 
@@ -154,9 +166,9 @@ def main(hyperparams={}):
             with torch.no_grad():
                 eval_total_start = time.time()
 
-                for set_name, writer, X, Y in [('train', train_writer, X_train, Y_train)]:#, ('dev', dev_writer, X_dev, Y_dev), ('test', test_writer, X_test, Y_test)]:
+                for set_name, writer, X, Y in [('train', train_writer, X_train, Y_train), ('dev', dev_writer, X_dev, Y_dev), ('test', test_writer, X_test, Y_test)]:
                     eval_set_start = time.time()
-                    ground_truth, predictions = predict_dataset(X, Y, model)
+                    ground_truth, predictions = predict_dataset(X, Y, model, word2Idx, char2Idx, 208, 71)
                     true_positives = (ground_truth == predictions).sum().item()
                     accuracy = true_positives / len(ground_truth)
                     writer.add_scalar(f"Accuracy", accuracy, epoch + 1)
