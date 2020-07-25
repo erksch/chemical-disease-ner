@@ -75,7 +75,7 @@ def extract_words_and_labels(datasets):
     words = set()
 
     print("Extracting words and labels...")
-    for dataset in datasets
+    for dataset in datasets:
         for sentence in dataset:
             for token, label in sentence:
                 labels.add(label)
