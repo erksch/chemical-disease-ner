@@ -180,7 +180,8 @@ def main(hyperparams={}):
                             precision = true_positives / (true_positives + false_positives)
 
                         f1_score = (2 * true_positives) / (2 * true_positives + false_positives + false_negatives)
-                        f1_scores[label] = f1_score
+                        if set_name == 'dev':
+                            f1_scores[label] = f1_score
 
                         print(f"\t{idx2Label[label]:<8} | P {precision:.2f} | R {recall:.2f} | F1 {f1_score:.2f}")
 
