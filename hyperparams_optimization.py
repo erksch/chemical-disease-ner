@@ -8,7 +8,7 @@ hyperparameter_space = {
     'dev_set_path': 'data/CDR_Data/CDR.Corpus.v010516/CDR_DevelopmentSet.BioC.xml',
     'test_set_path': 'data/CDR_Data/CDR.Corpus.v010516/CDR_TestSet.BioC.xml',
 
-    'hidden_dim': hp.quniform('hidden_dim', 1, 400, 10),
+    'hidden_dim': hp.quniform('hidden_dim', 1, 400, 1),
     'hyperopt_use_dropout': hp.choice('hyperopt_use_dropout', [
         {'dropout': 0.0, 'use_dropout': False},
         {'dropout': hp.uniform('dropout', 0.0, 1.0), 'use_dropout': True}
