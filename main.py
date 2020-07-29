@@ -99,11 +99,11 @@ def main(hyperparams={}):
     criterion = nn.CrossEntropyLoss(**loss_args)
 
     if CONFIG['optimizer'] == 'adam':
-        print(f"Using Adam optimizer with learning rate {CONFIG['learning_rate']}")
-        optimizer = torch.optim.Adam(model.parameters(), lr=CONFIG['learning_rate'])
+        print(f"Using Adam optimizer. LR {CONFIG['learning_rate']}, WD {CONFIG['weight_decay']}")
+        optimizer = torch.optim.Adam(model.parameters(), lr=CONFIG['learning_rate'], weight_decay=CONFIG['weight_decay'])
     elif CONFIG['optimizer'] == 'sgd':
-        print(f"Using SGD optimizer with learning rate {CONFIG['learning_rate']} and momentum {CONFIG['momentum']}")
-        optimizer = torch.optim.SGD(model.parameters(), lr=CONFIG['learning_rate'], momentum=CONFIG['momentum'])
+        print(f"Using SGD optimizer. LR {CONFIG['learning_rate']}, WD {CONFIG['weight_decay']}, momentum {CONFIG['momentum']}")
+        optimizer = torch.optim.SGD(model.parameters(), lr=CONFIG['learning_rate'], momentum=CONFIG['momentum'], weight_decay=CONFIG['weight_decay'])
     else:
         raise Error("No optimizer specified")
 

@@ -72,6 +72,7 @@ def load_config(hyperparams={}):
     CONFIG['epochs'] = configparser.getint('training', 'epochs')
     CONFIG['optimizer'] = configparser.get('training', 'optimizer')
     CONFIG['learning_rate'] = configparser.getfloat('training', 'learning_rate')
+    CONFIG['weight_decay'] = configparser.getfloat('training', 'weight_decay')
     CONFIG['momentum'] = configparser.getfloat('training', 'sgd_momentum')
     CONFIG['use_weighted_loss'] = configparser.getboolean('training', 'use_weighted_loss')
     CONFIG['null_class_weight'] = configparser.getfloat('training', 'null_class_weight')
