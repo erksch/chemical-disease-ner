@@ -33,7 +33,16 @@ def process_dataset_xml(file_path):
             offset = int(location.attributes['offset'].value)
             length = int(location.attributes['length'].value)
             labels.append([text[offset:offset+length], entity])
-            
+
+        flat_labels = []
+
+        for label_text, label in labels:
+            label_tokens = word_tokenize(label_text)
+            for token in label_tokens:
+                flat_labels.append([token, label])
+
+        labels = flat_labels
+
         token_labels = []
         label_idx = 0
         label_start = 0
