@@ -9,6 +9,9 @@ def get_text(node):
     return node.childNodes[0].data
     
 def process_dataset_xml(file_path):
+    print(f"Processing dataset {file_path}")
+    print()
+
     xml = minidom.parse(file_path)
     documents = xml.getElementsByTagName('document')
     all_sentences = []
@@ -24,7 +27,7 @@ def process_dataset_xml(file_path):
         annotations = document.getElementsByTagName('annotation')
         sentences = sent_tokenize(text)
         tokens = [word_tokenize(sentence) for sentence in sentences]
-        
+
         labels = []
         
         for annotation in annotations:
@@ -33,7 +36,7 @@ def process_dataset_xml(file_path):
             offset = int(location.attributes['offset'].value)
             length = int(location.attributes['length'].value)
             labels.append([text[offset:offset+length], entity])
-
+        
         flat_labels = []
 
         for label_text, label in labels:
@@ -73,7 +76,7 @@ def process_dataset_xml(file_path):
                     label_start = 0
             
             token_labels.append(out)
-
+        
         for sentence in token_labels:
             all_sentences.append(sentence)
 
