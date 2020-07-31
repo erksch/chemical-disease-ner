@@ -166,6 +166,8 @@ def text_to_indices(sentences, word2Idx, char2Idx, label2Idx, pad_chars_to):
     unknown_idx = word2Idx['UNKNOWN_TOKEN']
     char_padding_idx = char2Idx['PADDING']
 
+    print(f"Padding chars to {pad_chars_to}")
+
     X = []
     Y = []
 
@@ -202,3 +204,7 @@ def text_to_indices(sentences, word2Idx, char2Idx, label2Idx, pad_chars_to):
 
     return X, Y
 
+def chunks(lst, n):
+    """Yield successive n-sized chunks from lst."""
+    for i in range(0, len(lst), n):
+        yield lst[i:i + n]
