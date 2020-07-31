@@ -38,3 +38,7 @@ Then you can just launch a trainings run:
 ```console
 foo@bar:~/chemical-disease-ner$ python main.py
 ```
+
+### Colab demo
+
+A demo of a simplified version of our model can be found on [colab](https://colab.research.google.com/drive/1xSJgVzwlnMRBxE7SuWLLOLLCFP0EDrvm?usp=sharing)
