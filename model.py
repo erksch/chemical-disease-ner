@@ -17,8 +17,8 @@ class BiLSTM(nn.Module):
 
         self.char_embedding_dim = 30
         self.char_embedding = nn.Embedding(num_chars, self.char_embedding_dim)
-        self.conv2d = nn.Conv2d(208, 208, kernel_size=(1, 1))
-        self.maxpool = nn.MaxPool2d(kernel_size=(71, 1), stride=1)
+        self.conv2d = nn.Conv2d(30, 30, kernel_size=(1, 1))
+        self.maxpool = nn.MaxPool2d(kernel_size=(1, 71), stride=1)
 
         if CONFIG['use_pretrained_embeddings']:            
             self.word_embedding_dim = word_embeddings.shape[1] 
@@ -47,9 +47,10 @@ class BiLSTM(nn.Module):
 
         # char input
         xc = self.char_embedding(xc)    # (B, N, C, 30)
+        xc = xc.transpose(1, 3).transpose(2, 3)
         xc = self.conv2d(xc)    # (B, N, C, 128)
         xc = self.maxpool(xc)           # (B, N, C, 64)
-        xc = xc.squeeze(dim=2)
+        xc = xc.squeeze(dim=3).transpose(1, 2)
 
         # word / token input
         xt = self.word_embedding(xt)    # (B, N, E)

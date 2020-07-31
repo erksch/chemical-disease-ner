@@ -6,12 +6,27 @@ from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from dataset import CDRDataset, UniqueSentenceLengthSampler
 from config import load_config
-from utils import process_dataset_xml, prepare_embeddings, prepare_indices, text_to_indices
+from utils import process_dataset_xml, prepare_embeddings, prepare_indices, text_to_indices, chunks
 from model import BiLSTM
 
 device = torch.device('cuda')
 
-def predict_dataset(X, Y, net, word2Idx, char2Idx, padded_sentence_length, padded_word_length):
+def feed(tokens, chars, net, sentence_max_length, padding_token, padding_token_chars):
+    num_no_pad_tokens = len(tokens)
+    
+    while len(tokens) < sentence_max_length:
+        tokens.append(padding_token)
+        chars.append(padding_token_chars)
+
+    tokens = torch.LongTensor([tokens]).to(device)
+    chars = torch.LongTensor([chars]).to(device)
+    
+    predicted_labels = net(tokens, chars)
+    predicted_labels = predicted_labels.argmax(axis=2).squeeze(dim=0)[:num_no_pad_tokens]
+
+    return predicted_labels
+
+def predict_dataset(X, Y, net, word2Idx, char2Idx, sentence_max_length, padded_word_length):
     padding_token = word2Idx['PADDING_TOKEN']
     padding_char = char2Idx['PADDING']
     padding_token_chars = [padding_char for i in range(padded_word_length)]
@@ -23,21 +38,27 @@ def predict_dataset(X, Y, net, word2Idx, char2Idx, padded_sentence_length, padde
         tokens, chars = x
         true_labels = Y[i]
 
-        num_no_pad_tokens = len(tokens)
-        while len(tokens) < padded_sentence_length:
-            tokens.append(padding_token)
-            chars.append(padding_token_chars)
+        if len(tokens) > sentence_max_length:
+            token_chunks = list(chunks(tokens, sentence_max_length))
+            chars_chunks = list(chunks(chars, sentence_max_length))
+            true_labels_chunks = list(chunks(true_labels, sentence_max_length))
+       
+            for j in range(len(token_chunks)):
+                tokens = token_chunks[j]
+                chars = chars_chunks[j]
+                true_labels = true_labels_chunks[j]
 
-        tokens = torch.LongTensor([tokens]).to(device)
-        chars = torch.LongTensor([chars]).to(device)
-        true_labels = torch.LongTensor(true_labels).to(device)
+                predicted_labels = feed(tokens, chars, net, sentence_max_length, padding_token, padding_token_chars)
+                
+                for k in range(len(true_labels)):
+                    all_true_labels.append(true_labels[k])
+                    all_predicted_labels.append(predicted_labels[k].item())
+        else:
+            predicted_labels = feed(tokens, chars, net, sentence_max_length, padding_token, padding_token_chars)
 
-        predicted_labels = net(tokens, chars)
-        predicted_labels = predicted_labels.argmax(axis=2).squeeze(dim=0)[:num_no_pad_tokens]
-
-        for j in range(len(true_labels)):
-            all_true_labels.append(true_labels[j].item())
-            all_predicted_labels.append(predicted_labels[j].item())
+            for j in range(len(true_labels)):
+                all_true_labels.append(true_labels[j])
+                all_predicted_labels.append(predicted_labels[j].item())
 
     return torch.LongTensor(all_true_labels), torch.LongTensor(all_predicted_labels)
 
@@ -108,7 +129,7 @@ def main(hyperparams={}):
     X_test, Y_test = text_to_indices(test_sentences, word2Idx, char2Idx, label2Idx, pad_chars_to=71)
 
     if CONFIG['batch_mode'] == 'padded_sentences':
-        dataset_args = { 'pad_sentences': True, 'pad_sentences_max_length': 208 }
+        dataset_args = { 'pad_sentences': True, 'pad_sentences_max_length': CONFIG['padded_sentences_max_length'] }
     else:
         dataset_args = { 'pad_sentences': False }
 
@@ -180,7 +201,7 @@ def main(hyperparams={}):
 
                 for set_name, writer, X, Y in [('train', train_writer, X_train, Y_train), ('dev', dev_writer, X_dev, Y_dev), ('test', test_writer, X_test, Y_test)]:
                     eval_set_start = time.time()
-                    ground_truth, predictions = predict_dataset(X, Y, model, word2Idx, char2Idx, 208, 71)
+                    ground_truth, predictions = predict_dataset(X, Y, model, word2Idx, char2Idx, 20, 71)
                     true_positives = (ground_truth == predictions).sum().item()
                     accuracy = true_positives / len(ground_truth)
                     writer.add_scalar(f"Accuracy", accuracy, epoch + 1)

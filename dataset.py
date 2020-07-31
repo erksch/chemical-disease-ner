@@ -1,5 +1,6 @@
 import torch
 from torch.utils.data import Dataset, Sampler
+from utils import chunks
 
 class CDRDataset(Dataset):
 
@@ -30,22 +31,35 @@ class CDRDataset(Dataset):
 
         print(f"Padding sentences to length {self.max_length} with padding token {pad_token}.")
 
+        new_X = []
+        new_Y = []
+
         for i, sentence in enumerate(self.X):
             tokens, chars = sentence
+            y = self.Y[i]
+            
             if len(tokens) > self.max_length:
-                stripped_tokens += len(tokens) - self.max_length
-                self.X[i][0] = self.X[i][0][:self.max_length]
-                self.X[i][1] = self.X[i][1][:self.max_length]
-                self.Y[i] = self.Y[i][:self.max_length]
+                token_chunks = list(chunks(tokens, self.max_length))
+                char_chunks = list(chunks(chars, self.max_length))
+                y_chunks = list(chunks(y, self.max_length))
 
-            while len(tokens) < self.max_length:
-                added_padding_tokens += 1
-                self.X[i][0].append(pad_token)
-                self.X[i][1].append(padded_chars)
-                self.Y[i].append(pad_label)
+                for j in range(len(token_chunks)):
+                    while len(token_chunks[j]) < self.max_length:
+                        token_chunks[j].append(pad_token)
+                        char_chunks[j].append(padded_chars)
+                        y_chunks[j].append(pad_label)
+                    new_X.append([token_chunks[j], char_chunks[j]])
+                    new_Y.append(y_chunks[j])
+            else:
+                while len(tokens) < self.max_length:
+                    tokens.append(pad_token)
+                    chars.append(padded_chars)
+                    y.append(pad_label)
+                new_X.append([tokens, chars])
+                new_Y.append(y)
 
-        print(f"Removed {stripped_tokens} tokens from sentence longer than {self.max_length}")
-        print(f"Added {added_padding_tokens} padding tokens.")
+        self.X = new_X
+        self.Y = new_Y
 
     def __len__(self):
         return len(self.X)
