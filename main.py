@@ -34,10 +34,6 @@ def main(hyperparams={}):
 
     CONFIG = load_config(hyperparams)
 
-    train_writer = SummaryWriter(comment='/train')
-    dev_writer = SummaryWriter(comment='/dev')
-    test_writer = SummaryWriter(comment='/test')
-
     print("Preprocessing data...")
     train_sentences = process_dataset_xml(CONFIG['train_set_path'])
     dev_sentences = process_dataset_xml(CONFIG['dev_set_path'])
@@ -53,6 +49,11 @@ def main(hyperparams={}):
         model_args = { 'word_embeddings': torch.FloatTensor(word_embeddings).to(device) }
     else:
         word2Idx, label2Idx, idx2Label = prepare_indices([train_sentences, dev_sentences, test_sentences])
+
+    if CONFIG['batch_mode'] == 'padded_sentences':
+        model_args['batch_size'] = CONFIG['padded_sentences_batch_size']
+    else:
+        model_args['batch_size'] = 1
     
     vocab_size = len(word2Idx)
     num_classes = len(label2Idx)
@@ -76,15 +77,14 @@ def main(hyperparams={}):
         weight = CONFIG['non_null_class_weight'] if (count / total) < 0.1 else CONFIG['null_class_weight']
         weights.append(weight)
     print()
-    print(f"Weights: {weights}")
-
+    
     X_dev, Y_dev = text_to_indices(dev_sentences, word2Idx, label2Idx)
     X_test, Y_test = text_to_indices(test_sentences, word2Idx, label2Idx)
 
     if CONFIG['batch_mode'] == 'padded_sentences':
         dataset_args = { 'pad_sentences': True, 'pad_sentences_max_length': CONFIG['padded_sentences_max_length'] }
     else:
-        dataset_args = {}
+        dataset_args = { 'pad_sentences': False }
 
     dataset = CDRDataset(X_train, Y_train, word2Idx, label2Idx, **dataset_args)
 
@@ -94,8 +94,13 @@ def main(hyperparams={}):
         dataloader = DataLoader(dataset, batch_size=CONFIG['padded_sentences_batch_size'], shuffle=True)
     elif CONFIG['batch_mode'] == 'by_sentence_length':
         dataloader = DataLoader(dataset, batch_sampler=UniqueSentenceLengthSampler(dataset))
+    
+    if CONFIG['use_weighted_loss']:
+        print(f"Using weighted loss with weights {weights}")
+        loss_args = { "weight": torch.FloatTensor(weights).to(device) }
+    else:
+        loss_args = {}
 
-    loss_args = { "weight": torch.FloatTensor(weights).to(device) } if CONFIG['use_weighted_loss'] else {}
     criterion = nn.CrossEntropyLoss(**loss_args)
 
     if CONFIG['optimizer'] == 'adam':
@@ -103,7 +108,7 @@ def main(hyperparams={}):
         optimizer = torch.optim.Adam(model.parameters(), lr=CONFIG['learning_rate'], weight_decay=CONFIG['weight_decay'])
     elif CONFIG['optimizer'] == 'sgd':
         print(f"Using SGD optimizer. LR {CONFIG['learning_rate']}, WD {CONFIG['weight_decay']}, momentum {CONFIG['momentum']}")
-        optimizer = torch.optim.SGD(model.parameters(), lr=CONFIG['learning_rate'], momentum=CONFIG['momentum'], weight_decay=CONFIG['weight_decay'])
+        optimizer = torch.optim.SGD(model.parameters(), lr=CONFIG['learning_rate'], weight_decay=CONFIG['weight_decay'], momentum=CONFIG['momentum'])
     else:
         raise Error("No optimizer specified")
 
@@ -111,11 +116,16 @@ def main(hyperparams={}):
 
     print("Training...")
 
+    train_writer = SummaryWriter(comment='/train')
+    dev_writer = SummaryWriter(comment='/dev')
+    test_writer = SummaryWriter(comment='/test')
+
     for epoch in range(CONFIG['epochs']):  
         epoch_start = time.time()
         model.train()
 
         for batch_x, batch_y in dataloader:
+            model.zero_grad()
             optimizer.zero_grad()
 
             prediction = model(batch_x).reshape(-1, num_classes)
