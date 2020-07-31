@@ -77,6 +77,18 @@ def main(hyperparams={}):
 
     X_train, Y_train = text_to_indices(train_sentences, word2Idx, char2Idx, label2Idx, pad_chars_to=71)
 
+    """
+    num_before = len(Y_train)
+    indices_to_keep = []
+    for i, y in enumerate(Y_train):
+        if label2Idx['Disease'] in y or label2Idx['Chemical'] in y:
+            indices_to_keep.append(i)
+    
+    print(f"Ommiting {num_before - len(indices_to_keep)} of {num_before} sentences without non-null class.")
+    X_train = [X_train[i] for i in indices_to_keep]
+    Y_train = [Y_train[i] for i in indices_to_keep]
+    """
+
     print("Train dataset class distribution:")
     total = len([token for sentence in Y_train for token in sentence])
     weights = []
