@@ -8,7 +8,9 @@ from dataset import CDRDataset, UniqueSentenceLengthSampler
 from config import load_config
 from utils import process_dataset_xml, prepare_embeddings, prepare_indices, text_to_indices
 from model import BiLSTM
+from evaluation import evaluate
 
+torch.manual_seed(1)
 device = torch.device('cuda')
 
 def predict_dataset(X, Y, net):
@@ -16,15 +18,17 @@ def predict_dataset(X, Y, net):
     all_predicted_labels = []
 
     for i, x in enumerate(X):
-        tokens = torch.LongTensor([x]).to(device)
+        tokens = torch.LongTensor(x).to(device)
         true_labels = torch.LongTensor(Y[i]).to(device)
 
-        predicted_labels = net(tokens)
-        predicted_labels = predicted_labels.argmax(axis=2).squeeze(dim=0)
+        _, predicted_labels = net(tokens)
 
         for j in range(len(true_labels)):
             all_true_labels.append(true_labels[j].item())
-            all_predicted_labels.append(predicted_labels[j].item())
+            all_predicted_labels.append(predicted_labels[j])
+        
+        if i % 500 == 0:
+            print(i)
 
     return torch.LongTensor(all_true_labels), torch.LongTensor(all_predicted_labels)
 
@@ -33,10 +37,6 @@ def main(hyperparams={}):
     print(f"CUDA available: {torch.cuda.is_available()}")
 
     CONFIG = load_config(hyperparams)
-
-    train_writer = SummaryWriter(comment='/train')
-    dev_writer = SummaryWriter(comment='/dev')
-    test_writer = SummaryWriter(comment='/test')
 
     print("Preprocessing data...")
     train_sentences = process_dataset_xml(CONFIG['train_set_path'])
@@ -57,8 +57,11 @@ def main(hyperparams={}):
     vocab_size = len(word2Idx)
     num_classes = len(label2Idx)
     f1_scores = {label: 0.0 for label in idx2Label.keys()}
+    label2Idx_with_start_stop = label2Idx
+    label2Idx_with_start_stop["START"] = len(label2Idx_with_start_stop)
+    label2Idx_with_start_stop["STOP"] = len(label2Idx_with_start_stop)
 
-    model = BiLSTM(CONFIG, vocab_size=vocab_size, num_classes=num_classes, **model_args).to(device)
+    model = BiLSTM(CONFIG, label2Idx_with_start_stop, vocab_size=vocab_size, **model_args).to(device)
 
     X_train, Y_train = text_to_indices(train_sentences, word2Idx, label2Idx)
 
@@ -84,7 +87,7 @@ def main(hyperparams={}):
     if CONFIG['batch_mode'] == 'padded_sentences':
         dataset_args = { 'pad_sentences': True, 'pad_sentences_max_length': CONFIG['padded_sentences_max_length'] }
     else:
-        dataset_args = {}
+        dataset_args = { 'pad_sentences': False }
 
     dataset = CDRDataset(X_train, Y_train, word2Idx, label2Idx, **dataset_args)
 
@@ -109,7 +112,17 @@ def main(hyperparams={}):
 
     n_iter = 0
 
+    print("Initial evaluation:")
+
+    with torch.no_grad():
+        ground_truth, predictions = predict_dataset(X_train, Y_train, model)
+        evaluate('train', 0, idx2Label, ground_truth, predictions, write_to_tensorboard=False)
+    
     print("Training...")
+
+    train_writer = SummaryWriter(comment='/train')
+    dev_writer = SummaryWriter(comment='/dev')
+    test_writer = SummaryWriter(comment='/test')
 
     for epoch in range(CONFIG['epochs']):  
         epoch_start = time.time()
@@ -117,24 +130,27 @@ def main(hyperparams={}):
 
         for batch_x, batch_y in dataloader:
             optimizer.zero_grad()
+            model.zero_grad()
 
-            prediction = model(batch_x).reshape(-1, num_classes)
-            loss = criterion(prediction, batch_y.reshape(-1))
+            loss = model.neg_log_likelihood(batch_x[0], batch_y[0])
 
             loss.backward()
             optimizer.step()
 
             train_writer.add_scalar('Loss/train_step', loss, n_iter)
             n_iter += 1
+            if n_iter % 500 == 0:
+                print(f"Iteration {n_iter} | Loss {loss}")
 
         epoch_end = time.time()
 
         print(f"Epoch {epoch + 1} | Loss {loss.item():.2f} | Duration {(epoch_end - epoch_start):.2f}s")
-
+        
         if CONFIG['evaluate_only_at_end']:
             should_evaluate = (epoch + 1) == CONFIG['epochs']
         else:
             should_evaluate = (epoch + 1) == CONFIG['epochs'] or epoch % CONFIG['evaluation_interval'] == 0
+        should_evaluate = True
 
         if should_evaluate:
             model.eval()
@@ -145,45 +161,15 @@ def main(hyperparams={}):
                 for set_name, writer, X, Y in [('train', train_writer, X_train, Y_train), ('dev', dev_writer, X_dev, Y_dev), ('test', test_writer, X_test, Y_test)]:
                     eval_set_start = time.time()
                     ground_truth, predictions = predict_dataset(X, Y, model)
-                    true_positives = (ground_truth == predictions).sum().item()
-                    accuracy = true_positives / len(ground_truth)
-                    writer.add_scalar(f"Accuracy", accuracy, epoch + 1)
-                    
-                    print(f"{set_name} set evaluation:")
-                    
-                    for label in idx2Label.keys():
-                        indices_in_class = torch.where(ground_truth == label)[0]
-                        true_positives = (ground_truth[indices_in_class] == predictions[indices_in_class]).sum().item()
-                        false_negatives = len(indices_in_class) - true_positives
-                
-                        recall = true_positives / len(indices_in_class)
-
-                        indices_predicted_in_class = torch.where(predictions == label)[0]
-                        false_positives = (ground_truth[indices_predicted_in_class] != predictions[indices_predicted_in_class]).sum().item()
-
-                        if true_positives + false_positives == 0:
-                            precision = 0
-                        else:
-                            precision = true_positives / (true_positives + false_positives)
-
-                        f1_score = (2 * true_positives) / (2 * true_positives + false_positives + false_negatives)
-                        if set_name == 'dev':
-                            f1_scores[label] = f1_score
-
-                        print(f"\t{idx2Label[label]:<8} | P {precision:.2f} | R {recall:.2f} | F1 {f1_score:.2f}")
-
-                        writer.add_scalar(f"Precision/{idx2Label[label]}", precision, epoch + 1)
-                        writer.add_scalar(f"Recall/{idx2Label[label]}", recall, epoch + 1)
-                        writer.add_scalar(f"F1Score/{idx2Label[label]}", f1_score, epoch + 1)
-
+                    evaluate(set_name, epoch, idx2Label, ground_truth, predictions, writer=writer)
                     eval_set_end = time.time()
                     print(f"\tTook {(eval_set_end - eval_set_start):.2f}s")
 
                 eval_total_end = time.time()
                 print(f"\Total evaluation duration {(eval_total_end - eval_total_start):.2f}s")
-
-    f1_mean = (f1_scores[label2Idx['Disease']] + f1_scores[label2Idx['Chemical']]) / 2
-    return -f1_mean   
+        
+    #f1_mean = (f1_scores[label2Idx['Disease']] + f1_scores[label2Idx['Chemical']]) / 2
+    #return -f1_mean   
 
 if __name__ == '__main__':
     main()
