@@ -5,7 +5,7 @@ from prediction import predict_dataset
 def evaluate(X, Y, model, word2Idx, idx2Label, char2Idx, CONFIG, writer, writer_step):
     start = time.time()
 
-    prediciton_args = {}
+    prediction_args = {}
     if CONFIG['use_char_input']:
         prediction_args = { 'with_chars': True, 'pad_chars_to': CONFIG['char_pad_size'] }
 

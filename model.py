@@ -15,12 +15,6 @@ class BiLSTM(nn.Module):
 
         self.hidden_dim = CONFIG['hidden_dim']
 
-        if self.use_char_input:
-            self.char_embedding_dim = CONFIG['char_embeddings_dim']
-            self.char_embedding = nn.Embedding(num_chars, self.char_embedding_dim)
-            self.conv2d = nn.Conv2d(self.char_embedding_dim, self.char_embedding_dim, kernel_size=(1, 1))
-            self.maxpool = nn.MaxPool2d(kernel_size=(1, CONFIG['char_pad_size']), stride=1)
-
         if CONFIG['use_pretrained_embeddings']:            
             self.word_embedding_dim = word_embeddings.shape[1] 
             self.word_embedding = nn.Embedding.from_pretrained(word_embeddings)
@@ -28,8 +22,18 @@ class BiLSTM(nn.Module):
             self.word_embedding_dim = CONFIG['embeddings_dim']
             self.word_embedding = nn.Embedding(vocab_size, self.word_embedding_dim)
 
+        if self.use_char_input:
+            self.char_embedding_dim = CONFIG['char_embeddings_dim']
+            self.char_embedding = nn.Embedding(num_chars, self.char_embedding_dim)
+            self.conv2d = nn.Conv2d(self.char_embedding_dim, self.char_embedding_dim, kernel_size=(1, 1))
+            self.maxpool = nn.MaxPool2d(kernel_size=(1, CONFIG['char_pad_size']), stride=1)
+
+            lstm_input_dim = self.word_embedding_dim + self.char_embedding_dim
+        else:
+            lstm_input_dim = self.word_embedding_dim
+
         self.dropout = nn.Dropout(CONFIG['dropout'])
-        self.lstm = nn.LSTM(self.word_embedding_dim + self.char_embedding_dim, self.hidden_dim, bidirectional=True, batch_first=True)
+        self.lstm = nn.LSTM(lstm_input_dim, self.hidden_dim, bidirectional=True, batch_first=True)
         self.linear = nn.Linear(self.hidden_dim * 2, num_classes)
         
         if self.use_additional_linear_layers:
@@ -52,7 +56,9 @@ class BiLSTM(nn.Module):
 
             xt = self.word_embedding(xt)  
             x = torch.cat((xt, xc), dim=2)   
-            
+        else:
+            x = self.word_embedding(x)
+        
         self.hidden = self._init_hidden(x.shape[0])
         x, self.hidden = self.lstm(x, self.hidden)             
 

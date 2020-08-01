@@ -57,7 +57,7 @@ def main(hyperparams={}):
     else:
         dataset_args = { 'pad_sentences': False }
 
-    dataset = CDRDataset(X_train, Y_train, word2Idx, char2Idx, label2Idx, **dataset_args)
+    dataset = CDRDataset(X_train, Y_train, word2Idx, char2Idx, label2Idx, with_chars=CONFIG['use_char_input'], **dataset_args)
 
     if CONFIG['batch_mode'] == 'single':
         dataloader = DataLoader(dataset, batch_size=1, shuffle=True)
@@ -136,7 +136,7 @@ def main(hyperparams={}):
                 eval_total_end = time.time()
                 print(f"\Total evaluation duation {(eval_total_end - eval_total_start):.2f}s")
     
-    torch.save(model, 'model.pt')
+            torch.save(model, f"out/model_{epoch+1}.pt")
     
     f1_mean = (f1_scores[label2Idx['Disease']] + f1_scores[label2Idx['Chemical']]) / 2
     return -f1_mean   

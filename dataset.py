@@ -4,13 +4,14 @@ from utils import chunks
 
 class CDRDataset(Dataset):
 
-    def __init__(self, X, Y, word2Idx, char2Idx, label2Idx, pad_sentences=False, pad_sentences_max_length=-1):
+    def __init__(self, X, Y, word2Idx, char2Idx, label2Idx, with_chars=False, pad_sentences=False, pad_sentences_max_length=-1):
         self.X = X
         self.Y = Y
         self.word2Idx = word2Idx
         self.char2Idx = char2Idx
         self.label2Idx = label2Idx
         self.max_length = pad_sentences_max_length
+        self.with_chars = with_chars
 
         if pad_sentences:
             self._pad_sentences()
@@ -65,7 +66,11 @@ class CDRDataset(Dataset):
         return len(self.X)
 
     def __getitem__(self, idx):
-        return torch.LongTensor(self.X[idx][0]).to('cuda'), torch.LongTensor(self.X[idx][1]).to('cuda'), torch.LongTensor(self.Y[idx]).to('cuda')
+        if self.with_chars:
+            return torch.LongTensor(self.X[idx][0]).to('cuda'), torch.LongTensor(self.X[idx][1]).to('cuda'), torch.LongTensor(self.Y[idx]).to('cuda')
+        else:
+            return torch.LongTensor(self.X[idx]).to('cuda'), torch.LongTensor(self.Y[idx]).to('cuda')
+
 
 class UniqueSentenceLengthSampler(Sampler):
     
