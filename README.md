@@ -1,44 +1,55 @@
 # Chemical & Disease Named Entity Recognition
 
-## Local Setup
+## Setup
 
-### Python Setup
+Clone the repository and enter the directory
 
-go into the repos directory and create a virtual env
-
-```console
-foo@bar:~$ cd chemical-disease-ner
-foo@bar:~/chemical-disease-ner$ python3 -m venv venv
+```
+git clone git@github.com:erksch/chemical-disease-ner.git
+cd chemical-disease-ner
 ```
 
-activate the virtual env
+Create a python virtual env and activate it
 
-```console
-foo@bar:~/chemical-disease-ner$ source venv/bin/activate
+```
+python3 -m venv venv
+source venv/bin/activate
 ```
 
-Install the requirements
+Install requirements
 
-```console
-foo@bar:~/chemical-disease-ner$ pip install -r requirements.txt
+```
+pip install -r requirements.txt
 ```
 
-### Load the embeddings
+### Downloading the pretrained embeddings
 
-```console
-foo@bar:~/chemical-disease-ner$ cd embeddings
-foo@bar:~/chemical-disease-ner/embeddings$ wget https://ftp.ncbi.nlm.nih.gov/pub/lu/Suppl/BioSentVec/BioWordVec_PubMed_MIMICIII_d200.vec.bin
+Using pretrained embeddings is optional and can be configured in the config file but using them yields the best results.
+The used BioWordVec embeddings can be downloaded to the embeddings folder with
+
+```
+cd embeddings
+wget https://ftp.ncbi.nlm.nih.gov/pub/lu/Suppl/BioSentVec/BioWordVec_PubMed_MIMICIII_d200.vec.bin
 ```
 
-### Execute model
+### Training the model
 
-The models parameters can be adapted in the example.ini file
-Then you can just launch a trainings run:
+Copy the `example.ini` and create your own config file.
+Then run the training and specify your config file with
 
-```console
-foo@bar:~/chemical-disease-ner$ python main.py
+```
+python main.py --config myconfig.ini
+```
+
+### Viewing results in TensorBoard
+
+The training procedure automatically writes to the TensorBoard log directory `runs`.
+To open TensorBoard and view the training progress run
+
+```
+tensorboard --logdir runs
 ```
 
 ### Colab demo
 
-A demo of a simplified version of our model can be found on [colab](https://colab.research.google.com/drive/1xSJgVzwlnMRBxE7SuWLLOLLCFP0EDrvm?usp=sharing)
+A demo of a simplified version of our model can be found on [colab](https://colab.research.google.com/drive/1xSJgVzwlnMRBxE7SuWLLOLLCFP0EDrvm?usp=sharing).
