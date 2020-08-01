@@ -6,61 +6,12 @@ from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from dataset import CDRDataset, UniqueSentenceLengthSampler
 from config import load_config
-from utils import process_dataset_xml, prepare_embeddings, prepare_indices, text_to_indices, chunks
+from utils import process_dataset_xml, prepare_embeddings, prepare_indices, text_to_indices, analyze_label_distribution
+from prediction import predict_dataset
+from evaluate import evaluate
 from model import BiLSTM
 
 device = torch.device('cuda')
-
-def feed(tokens, chars, net, sentence_max_length, padding_token, padding_token_chars):
-    num_no_pad_tokens = len(tokens)
-    
-    while len(tokens) < sentence_max_length:
-        tokens.append(padding_token)
-        chars.append(padding_token_chars)
-
-    tokens = torch.LongTensor([tokens]).to(device)
-    chars = torch.LongTensor([chars]).to(device)
-    
-    predicted_labels = net(tokens, chars)
-    predicted_labels = predicted_labels.argmax(axis=2).squeeze(dim=0)[:num_no_pad_tokens]
-
-    return predicted_labels
-
-def predict_dataset(X, Y, net, word2Idx, char2Idx, sentence_max_length, padded_word_length):
-    padding_token = word2Idx['PADDING_TOKEN']
-    padding_char = char2Idx['PADDING']
-    padding_token_chars = [padding_char for i in range(padded_word_length)]
-
-    all_true_labels = []
-    all_predicted_labels = []
-
-    for i, x in enumerate(X):
-        tokens, chars = x
-        true_labels = Y[i]
-
-        if len(tokens) > sentence_max_length:
-            token_chunks = list(chunks(tokens, sentence_max_length))
-            chars_chunks = list(chunks(chars, sentence_max_length))
-            true_labels_chunks = list(chunks(true_labels, sentence_max_length))
-       
-            for j in range(len(token_chunks)):
-                tokens = token_chunks[j]
-                chars = chars_chunks[j]
-                true_labels = true_labels_chunks[j]
-
-                predicted_labels = feed(tokens, chars, net, sentence_max_length, padding_token, padding_token_chars)
-                
-                for k in range(len(true_labels)):
-                    all_true_labels.append(true_labels[k])
-                    all_predicted_labels.append(predicted_labels[k].item())
-        else:
-            predicted_labels = feed(tokens, chars, net, sentence_max_length, padding_token, padding_token_chars)
-
-            for j in range(len(true_labels)):
-                all_true_labels.append(true_labels[j])
-                all_predicted_labels.append(predicted_labels[j].item())
-
-    return torch.LongTensor(all_true_labels), torch.LongTensor(all_predicted_labels)
 
 def main(hyperparams={}):
     print(f"Torch Version: {torch.__version__}")
@@ -80,14 +31,9 @@ def main(hyperparams={}):
         word_embeddings, word2Idx, char2Idx, label2Idx, idx2Label = prepare_embeddings(
             [train_sentences, dev_sentences, test_sentences], 
             embeddings_path=CONFIG['pretrained_embeddings_path'])
-        model_args = { 'word_embeddings': torch.FloatTensor(word_embeddings).to(device) }
+        model_args['word_embeddings'] = torch.FloatTensor(word_embeddings).to(device)
     else:
         word2Idx, char2Idx, label2Idx, idx2Label = prepare_indices([train_sentences, dev_sentences, test_sentences])
-
-    if CONFIG['batch_mode'] == 'padded_sentences':
-        model_args['batch_size'] = CONFIG['padded_sentences_batch_size']
-    else:
-        model_args['batch_size'] = 1
     
     vocab_size = len(word2Idx)
     num_classes = len(label2Idx)
@@ -96,37 +42,15 @@ def main(hyperparams={}):
 
     model = BiLSTM(CONFIG, vocab_size=vocab_size, num_classes=num_classes, num_chars=num_chars, **model_args).to(device)
 
-    X_train, Y_train = text_to_indices(train_sentences, word2Idx, char2Idx, label2Idx, pad_chars_to=71)
+    text_to_indices_args = {}
+    if CONFIG['use_char_input']:
+        text_to_indices_args = { 'with_chars': True, 'pad_chars_to': CONFIG['char_pad_size'] }
 
-    """
-    num_before = len(Y_train)
-    indices_to_keep = []
-    for i, y in enumerate(Y_train):
-        if label2Idx['Disease'] in y or label2Idx['Chemical'] in y:
-            indices_to_keep.append(i)
-    
-    print(f"Ommiting {num_before - len(indices_to_keep)} of {num_before} sentences without non-null class.")
-    X_train = [X_train[i] for i in indices_to_keep]
-    Y_train = [Y_train[i] for i in indices_to_keep]
-    """
+    X_train, Y_train = text_to_indices(train_sentences, word2Idx, char2Idx, label2Idx, **text_to_indices_args)
+    X_dev, Y_dev = text_to_indices(dev_sentences, word2Idx, char2Idx, label2Idx, **text_to_indices_args)
+    X_test, Y_test = text_to_indices(test_sentences, word2Idx, char2Idx, label2Idx, **text_to_indices_args)
 
-    print("Train dataset class distribution:")
-    total = len([token for sentence in Y_train for token in sentence])
-    weights = []
-    print(f"Total of {total} tokens")
-    for i, label in enumerate(label2Idx):
-        count = 0
-        for sentence in Y_train:
-            count += len(np.where(np.array(sentence) == label2Idx[label])[0])
-        end = ' | ' if i < len(label2Idx) -1 else ''
-        print(f"{label} {count} {count / total:.2f}", end=end)
-
-        weight = CONFIG['non_null_class_weight'] if (count / total) < 0.1 else CONFIG['null_class_weight']
-        weights.append(weight)
-    print()
-
-    X_dev, Y_dev = text_to_indices(dev_sentences, word2Idx, char2Idx, label2Idx, pad_chars_to=71)
-    X_test, Y_test = text_to_indices(test_sentences, word2Idx, char2Idx, label2Idx, pad_chars_to=71)
+    analyze_label_distribution('Train', Y_train, label2Idx)
 
     if CONFIG['batch_mode'] == 'padded_sentences':
         dataset_args = { 'pad_sentences': True, 'pad_sentences_max_length': CONFIG['padded_sentences_max_length'] }
@@ -143,6 +67,7 @@ def main(hyperparams={}):
         dataloader = DataLoader(dataset, batch_sampler=UniqueSentenceLengthSampler(dataset))
     
     if CONFIG['use_weighted_loss']:
+        weights = [CONFIG['null_class_weight'] if label == 'O' else CONFIG['non_null_class_weight'] for label in label2Idx]
         print(f"Using weighted loss with weights {weights}")
         loss_args = { "weight": torch.FloatTensor(weights).to(device) }
     else:
@@ -171,11 +96,17 @@ def main(hyperparams={}):
         epoch_start = time.time()
         model.train()
 
-        for batch_x_tokens, batch_x_chars, batch_y in dataloader:
+        for batch in dataloader:
             model.zero_grad()
             optimizer.zero_grad()
 
-            prediction = model(batch_x_tokens, batch_x_chars).reshape(-1, num_classes)
+            if CONFIG['use_char_input']:
+                batch_x_tokens, batch_x_chars, batch_y = batch
+                prediction = model((batch_x_tokens, batch_x_chars)).reshape(-1, num_classes)
+            else:
+                batch_x, batch_y = batch
+                prediction = model(batch_x).reshape(-1, num_classes)
+
             loss = criterion(prediction, batch_y.reshape(-1))
 
             loss.backward()
@@ -194,53 +125,10 @@ def main(hyperparams={}):
             should_evaluate = (epoch + 1) == CONFIG['epochs'] or epoch % CONFIG['evaluation_interval'] == 0
 
         if should_evaluate:
-            model.eval()
-
-            with torch.no_grad():
-                eval_total_start = time.time()
-
-                for set_name, writer, X, Y in [('train', train_writer, X_train, Y_train), ('dev', dev_writer, X_dev, Y_dev), ('test', test_writer, X_test, Y_test)]:
-                    eval_set_start = time.time()
-                    ground_truth, predictions = predict_dataset(X, Y, model, word2Idx, char2Idx, 20, 71)
-                    true_positives = (ground_truth == predictions).sum().item()
-                    accuracy = true_positives / len(ground_truth)
-                    writer.add_scalar(f"Accuracy", accuracy, epoch + 1)
-                    
-                    print(f"{set_name} set evaluation:")
-                    
-                    for label in idx2Label.keys():
-                        indices_in_class = torch.where(ground_truth == label)[0]
-                        true_positives = (ground_truth[indices_in_class] == predictions[indices_in_class]).sum().item()
-                        false_negatives = len(indices_in_class) - true_positives
-                
-                        recall = true_positives / len(indices_in_class)
-
-                        indices_predicted_in_class = torch.where(predictions == label)[0]
-                        false_positives = (ground_truth[indices_predicted_in_class] != predictions[indices_predicted_in_class]).sum().item()
-
-                        if true_positives + false_positives == 0:
-                            precision = 0
-                        else:
-                            precision = true_positives / (true_positives + false_positives)
-
-                        f1_score = (2 * true_positives) / (2 * true_positives + false_positives + false_negatives)
-                        if set_name == 'dev':
-                            f1_scores[label] = f1_score
-
-                        print(f"\t{idx2Label[label]:<8} | P {precision:.2f} | R {recall:.2f} | F1 {f1_score:.2f}")
-
-                        writer.add_scalar(f"Precision/{idx2Label[label]}", precision, epoch + 1)
-                        writer.add_scalar(f"Recall/{idx2Label[label]}", recall, epoch + 1)
-                        writer.add_scalar(f"F1Score/{idx2Label[label]}", f1_score, epoch + 1)
-
-                    eval_set_end = time.time()
-                    print(f"\tTook {(eval_set_end - eval_set_start):.2f}s")
-
-                eval_total_end = time.time()
-                print(f"\Total evaluation duration {(eval_total_end - eval_total_start):.2f}s")
+            evaluate(model)
     
-    #f1_mean = (f1_scores[label2Idx['Disease']] + f1_scores[label2Idx['Chemical']]) / 2
-    #return -f1_mean   
+    f1_mean = (f1_scores[label2Idx['Disease']] + f1_scores[label2Idx['Chemical']]) / 2
+    return -f1_mean   
 
 if __name__ == '__main__':
     main()

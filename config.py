@@ -59,6 +59,9 @@ def load_config(hyperparams={}):
     CONFIG['dropout'] = configparser.getfloat('network', 'dropout')
     CONFIG['use_dropout'] = configparser.getboolean('network', 'use_dropout')
     CONFIG['use_additional_linear_layers'] = configparser.getboolean('network', 'use_additional_linear_layers')
+    CONFIG['use_char_input'] = configparser.getboolean('network', 'use_char_input')
+    CONFIG['char_pad_size'] = configparser.getint('network', 'char_pad_size')
+    CONFIG['char_embeddings_dim'] = configparser.getint('network', 'char_embeddings_dim')
 
     # embeddings
     CONFIG['use_pretrained_embeddings'] = configparser.getboolean('embeddings', 'use_pretrained_embeddings')
