@@ -32,7 +32,7 @@ class BiLSTM(nn.Module):
         self.lstm = nn.LSTM(self.word_embedding_dim + self.char_embedding_dim, self.hidden_dim, bidirectional=True, batch_first=True)
         self.linear = nn.Linear(self.hidden_dim * 2, num_classes)
         
-        self.use_additional_linear_layers:
+        if self.use_additional_linear_layers:
             self.linear1 = nn.Linear(self.hidden_dim * 2, self.hidden_dim)
             self.linear2 = nn.Linear(self.hidden_dim , 64)
             self.linear3 = nn.Linear(64, num_classes)

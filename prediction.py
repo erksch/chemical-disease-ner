@@ -1,5 +1,7 @@
 import torch
 
+device = torch.device('cuda')
+
 def predict_dataset(X, Y, model, word2Idx, char2Idx, with_chars=False, pad_chars_to=None):
     padding_token = word2Idx['PADDING_TOKEN']
 
@@ -22,7 +24,7 @@ def predict_dataset(X, Y, model, word2Idx, char2Idx, with_chars=False, pad_chars
             tokens = torch.LongTensor([x]).to(device)
             predicted_labels = model(tokens)
         
-        predicted_labels = predicted_labels.argmax(axis=2).squeeze(dim=0)[:num_no_pad_tokens]
+        predicted_labels = predicted_labels.argmax(axis=2).squeeze(dim=0)
             
         for j in range(len(true_labels)):
             all_true_labels.append(true_labels[j])

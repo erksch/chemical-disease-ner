@@ -8,7 +8,7 @@ from dataset import CDRDataset, UniqueSentenceLengthSampler
 from config import load_config
 from utils import process_dataset_xml, prepare_embeddings, prepare_indices, text_to_indices, analyze_label_distribution
 from prediction import predict_dataset
-from evaluate import evaluate
+from evaluation import evaluate
 from model import BiLSTM
 
 device = torch.device('cuda')
@@ -125,7 +125,18 @@ def main(hyperparams={}):
             should_evaluate = (epoch + 1) == CONFIG['epochs'] or epoch % CONFIG['evaluation_interval'] == 0
 
         if should_evaluate:
-            evaluate(model)
+            model.eval()
+            with torch.no_grad():
+                eval_total_start = time.time()
+
+                for set_name, writer, X, Y in [('train', train_writer, X_train, Y_train), ('dev', dev_writer, X_dev, Y_dev), ('test', test_writer, X_test, Y_test)]:
+                    print(f"{set_name} set evaluation:")
+                    evaluate(X, Y, model, word2Idx, idx2Label, char2Idx, CONFIG, writer, epoch + 1)
+
+                eval_total_end = time.time()
+                print(f"\Total evaluation duation {(eval_total_end - eval_total_start):.2f}s")
+    
+    torch.save(model, 'model.pt')
     
     f1_mean = (f1_scores[label2Idx['Disease']] + f1_scores[label2Idx['Chemical']]) / 2
     return -f1_mean   
