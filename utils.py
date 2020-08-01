@@ -10,7 +10,6 @@ def get_text(node):
     
 def process_dataset_xml(file_path):
     print(f"Processing dataset {file_path}")
-    print()
 
     xml = minidom.parse(file_path)
     documents = xml.getElementsByTagName('document')
@@ -217,6 +216,6 @@ def analyze_label_distribution(dataset_name, Y, label2Idx):
     print()
 
 def chunks(lst, n):
-"""Yield successive n-sized chunks from lst."""
-for i in range(0, len(lst), n):
-    yield lst[i:i + n]
+    """Yield successive n-sized chunks from lst."""
+    for i in range(0, len(lst), n):
+        yield lst[i:i + n]
