@@ -162,23 +162,21 @@ def prepare_embeddings(datasets, embeddings_path):
     
     return word_embeddings, word2Idx, char2Idx, label2Idx, idx2Label
 
-def text_to_indices(sentences, word2Idx, char2Idx, label2Idx, pad_chars_to):
+def text_to_indices(sentences, word2Idx, char2Idx, label2Idx, with_chars=False, pad_chars_to=None):
     unknown_idx = word2Idx['UNKNOWN_TOKEN']
     char_padding_idx = char2Idx['PADDING']
 
-    print(f"Padding chars to {pad_chars_to}")
+    if with_chars: print(f"Padding chars to {pad_chars_to}")
 
     X = []
     Y = []
 
     null_label = 'O'
-    sentence_max_length = -1
 
     for sentence in sentences:
         word_indices = []
         label_indices = []
         char_indices = []
-        sentence_max_length = max(len(sentence), sentence_max_length)
 
         for word, label in sentence:
             if word in word2Idx:
@@ -188,23 +186,37 @@ def text_to_indices(sentences, word2Idx, char2Idx, label2Idx, pad_chars_to):
             else:
                 wordIdx = unknown_idx
                         
-            chars = [char2Idx[char] for char in word]
-            
-            while len(chars) < pad_chars_to:
-                chars.append(char_padding_idx)
+            if with_chars:
+                chars = [char2Idx[char] for char in word]
+                if len(chars) > pad_chars_to:
+                    chars = chars[:pad_chars_to]
+                while len(chars) < pad_chars_to:
+                    chars.append(char_padding_idx)
+                char_indices.append(chars)
             
             word_indices.append(wordIdx)
-            char_indices.append(chars)
             label_indices.append(label2Idx[label])
 
-        X.append([word_indices, char_indices])
+        X.append([word_indices, char_indices] if with_chars else word_indices)
         Y.append(label_indices)
-
-    print(f"Sentence max length {sentence_max_length}")
 
     return X, Y
 
+def analyze_label_distribution(dataset_name, Y, label2Idx):
+    print(f"{dataset_name} dataset class distribution:")
+    
+    total = len([token for sentence in Y for token in sentence])
+    print(f"Total of {total} tokens")
+
+    for i, label in enumerate(label2Idx):
+        count = 0
+        for sentence in Y:
+            count += len(np.where(np.array(sentence) == label2Idx[label])[0])
+        end = ' | ' if i < len(label2Idx) -1 else ''
+        print(f"{label} {count} {count / total:.2f}", end=end)
+    print()
+
 def chunks(lst, n):
-    """Yield successive n-sized chunks from lst."""
-    for i in range(0, len(lst), n):
-        yield lst[i:i + n]
+"""Yield successive n-sized chunks from lst."""
+for i in range(0, len(lst), n):
+    yield lst[i:i + n]
